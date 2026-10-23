@@ -42,3 +42,30 @@ terraform.rc
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
 # planout
+# --- Kubernetes access (never commit) ---
+kubeconfig
+*.kubeconfig
+.kube/
+
+# --- Secrets ---
+.env
+.env.*
+*.pem
+*.key
+secrets/
+*.secret.yaml
+
+# --- Helm packaged dependencies ---
+charts/*/charts/
+*.tgz
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
