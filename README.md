@@ -1,4 +1,5 @@
 # Handover: 5G Operations Lab
+![kpi-exporter image](https://github.com/rugerious/handover-5g/actions/workflows/kpi-exporter.yml/badge.svg)
 
 > In RAN, a handover moves a call to a new cell without dropping it.
 > This project is my handover from RAN to cloud.
