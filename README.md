@@ -8,7 +8,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 
 ## Status
 
-🚧 **Phase 0: Foundations** (October 2026). Built in public, one step at a time.
+✅ **Phase 0: Foundations** done (27 Oct 2026): repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, and CI that builds it and publishes it to GHCR. Next: **Phase 1, AWS infrastructure**.
 
 ## Planned architecture
 
@@ -23,7 +23,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Foundations: repo, local Kubernetes, first container image and CI | 🚧 |
+| 0 | Foundations: repo, local Kubernetes, first container image and CI | ✅ |
 | 1 | Infrastructure: VPC, EC2, Terraform, Ansible, k3s | ⏳ |
 | 2 | 5G workloads on Kubernetes | ⏳ |
 | 3 | GitOps with ArgoCD | ⏳ |
