@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kpi-exporter
+  labels:
+    app: kpi-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kpi-exporter
+  template:
+    metadata:
+      labels:
+        app: kpi-exporter
+    spec:
+      containers:
+        - name: exporter
+          image: handover/kpi-exporter:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CELL_ID
+              value: lab-cell-1
+            - name: PROMETHEUS_DISABLE_CREATED_SERIES
+              value: "True"
+          ports:
+            - name: metrics
+              containerPort: 9100
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
