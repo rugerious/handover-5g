@@ -49,7 +49,7 @@ resource "aws_iam_instance_profile" "instance" {
 # ---------------------------------------------------------------------------
 
 resource "aws_instance" "node" {
-  ami                         = data.aws_ssm_parameter.ubuntu_2404.value
+  ami                         = nonsensitive(data.aws_ssm_parameter.ubuntu_2404.value) # public AMI ID, not a secret
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.instance.id]
