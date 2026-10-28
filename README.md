@@ -1,36 +1,66 @@
 # Handover: 5G Operations Lab
-![kpi-exporter image](https://github.com/rugerious/handover-5g/actions/workflows/kpi-exporter.yml/badge.svg)
+![terraform](https://github.com/rugerious/handover-5g/actions/workflows/terraform.yml/badge.svg) ![kpi-exporter image](https://github.com/rugerious/handover-5g/actions/workflows/kpi-exporter.yml/badge.svg)
 
 > In RAN, a handover moves a call to a new cell without dropping it.
 > This project is my handover from RAN to cloud.
 
-A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) running on Kubernetes, deployed by GitOps, with KPI observability, automated acceptance testing and an AI ops assistant that proposes fixes for human approval.
+A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) running on Kubernetes in AWS, deployed by GitOps, with RAN KPI observability, automated acceptance testing and an AI ops assistant.
+
+**The goal:** degrade a UE's radio on purpose → a model detects the KPI drop → an LLM explains it → the fix arrives as a pull request → a human approves → the KPIs recover → an acceptance report is published.
 
 ## Status
 
-✅ **Phase 0: Foundations** done (27 Oct 2026): repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, and CI that builds it and publishes it to GHCR. Next: **Phase 1, AWS infrastructure**.
+| Phase | What | Hours | Status |
+|---|---|---|---|
+| 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
+| 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | 🚧 1.1–1.3 done |
+| 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | ⏳ |
+| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
+| 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
+| — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
+| 5 | Multi-UE + radio degradation injector; automated acceptance with public reports | 11–14 | ⏳ |
+| 6 | AI ops assistant: Isolation Forest detects, LLM explains, MCP tools (read / dry-run / open PR only), fix by pull request, incident in [CloudOps](https://github.com/rugerious/cloudops-aws-platform) | 13–17 | ⏳ |
+| 7 | Demo video and write-up | 4–6 | ⏳ |
+| | **Total** | **67–88** | |
+
+Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks. That includes about 6 hours added on 28 Oct 2026 after reviewing 14 OCUDU community projects (multi-UE, radio degradation, NetworkPolicies, public reports, MCP tools).
+
+## What is built so far
+
+**Delivery pipeline (no stored AWS keys)**
+- Terraform state in S3: versioned, encrypted, HTTPS-only, with native locking.
+- GitHub Actions gets short-lived AWS credentials through **OIDC**:
+  - pull requests → `plan` with a **read-only** role that cannot read any other S3 object in the account;
+  - merge to `main` → `apply` of exactly the planned change, **only after a human approves** the `production` environment.
+- The apply role can manage only `handover-*` IAM resources and **cannot modify its own permissions**.
+- Dependabot keeps actions, Python, Docker and Terraform dependencies current.
+
+**Network and node**
+- One VPC and public subnet, **no NAT gateway** (it would cost more than the whole lab budget).
+- The node's security group has **zero inbound rules**; outbound is limited to ports 80 and 443. Rejected traffic is recorded with VPC Flow Logs.
+- `m7i.xlarge` Ubuntu 24.04 node with an encrypted disk and **IMDSv2 only**.
+- Shell access through **SSM Session Manager**: no SSH key, no open port.
+- **Stops itself every night at 23:00** (EventBridge Scheduler), so a forgotten session costs one evening, not a month.
 
 ## Planned architecture
 
-- **RAN + core:** OCUDU gNB and srsUE over ZeroMQ, Open5GS 5G core, packaged with Helm
-- **Platform:** k3s on AWS EC2, built with Terraform and Ansible, no SSH (SSM only), zero inbound ports
-- **Delivery:** ArgoCD (GitOps) and GitHub Actions with OIDC (no stored AWS keys)
+- **RAN + core:** OCUDU gNB (Linux Foundation, formerly srsRAN Project) and srsUE over ZeroMQ, Open5GS 5G core, packaged with Helm, every version pinned in one manifest
+- **Platform:** k3s on AWS EC2, built with Terraform and Ansible
+- **Delivery:** ArgoCD (GitOps) and GitHub Actions with OIDC
 - **Observability:** Prometheus and Grafana dashboards for RAN KPIs, with alerting
-- **Acceptance:** automated pass/fail reports per deployment, plus fault injection
-- **AI ops:** an assistant that detects KPI degradation, opens a pull request with a fix and raises an incident in [CloudOps](https://github.com/rugerious/cloudops-aws-platform); a human merges
+- **Acceptance:** pass/fail reports with KPI thresholds for every deployment, platform and radio fault injection, reports published on GitHub Pages
+- **AI ops:** classic ML detects, an LLM explains, an MCP server exposes read, dry-run and open-PR tools; nothing is applied without a human merge
 
-## Roadmap
+Several ideas come from projects in the OCUDU and srsRAN community (NIST O-RAN Testbed Automation, Tiny_Twin-OCUDU, the OCUDU dApp platform, SUSE's OCUDU reference architecture).
 
-| Phase | What | Status |
-|---|---|---|
-| 0 | Foundations: repo, local Kubernetes, first container image and CI | ✅ |
-| 1 | Infrastructure: VPC, EC2, Terraform, Ansible, k3s | ⏳ |
-| 2 | 5G workloads on Kubernetes | ⏳ |
-| 3 | GitOps with ArgoCD | ⏳ |
-| 4 | Observability: RAN KPI dashboards and alerts | ⏳ |
-| 5 | Automated acceptance and fault injection | ⏳ |
-| 6 | AI ops assistant | ⏳ |
-| 7 | Demo video and write-up | ⏳ |
+## Repository layout
+
+| Path | What |
+|---|---|
+| `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute |
+| `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
+| `labs/` | Kubernetes learning labs |
+| `.github/` | CI workflows and Dependabot |
 
 ## Licence
 
