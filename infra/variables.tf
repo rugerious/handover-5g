@@ -26,7 +26,7 @@ variable "github_owner_id" {
 variable "github_repo_id" {
   description = "Numeric ID of the repository (for ID-based OIDC subjects)"
   type        = string
-  default     = "NNNN"
+  default     = "1431607706"
 
   validation {
     condition     = can(regex("^[0-9]+$", var.github_repo_id))
