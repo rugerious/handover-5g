@@ -13,8 +13,8 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | Phase | What | Hours | Status |
 |---|---|---|---|
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
-| 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | 🚧 1.1–1.4 done (k3s running) |
-| 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | ⏳ |
+| 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
+| 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | ⏭️ next |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
@@ -34,6 +34,7 @@ Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks
   - merge to `main` → `apply` of exactly the planned change, **only after a human approves** the `production` environment.
 - The apply role can manage only `handover-*` IAM resources and **cannot modify its own permissions**.
 - Dependabot keeps actions, Python, Docker and Terraform dependencies current.
+- GitHub **secret scanning, push protection** and **Dependabot security updates** are on.
 - A **pre-commit hook** (`.githooks/pre-commit`) blocks any commit that adds the AWS account ID or other listed values. The values live outside the repo, so the hook itself reveals nothing. Every PR also carries a checklist (README, plan read, no identifiers).
 
 **Network and node**
