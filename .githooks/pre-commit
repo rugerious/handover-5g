@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Blocks a commit if the lines being added contain a forbidden value
+# (the AWS account ID, email addresses...). The values live OUTSIDE the repo,
+# in ~/.config/handover/forbidden-patterns (one per line), so this script
+# reveals nothing. Enable once per clone:  git config core.hooksPath .githooks
+set -euo pipefail
+
+patterns_file="${HANDOVER_FORBIDDEN:-$HOME/.config/handover/forbidden-patterns}"
+
+if [[ ! -s "$patterns_file" ]]; then
+  echo "pre-commit: WARNING - no patterns file at $patterns_file, check skipped" >&2
+  exit 0
+fi
+
+# Build the list to search for. A 12-digit account ID is also checked in the
+# console's 1234-5678-9012 form.
+patterns="$(mktemp)"
+trap 'rm -f "$patterns"' EXIT
+while IFS= read -r p || [[ -n "$p" ]]; do
+  [[ -z "$p" || "$p" == \#* ]] && continue
+  printf '%s\n' "$p" >>"$patterns"
+  if [[ "$p" =~ ^[0-9]{12}$ ]]; then
+    printf '%s\n' "${p:0:4}-${p:4:4}-${p:8:4}" >>"$patterns"
+  fi
+done <"$patterns_file"
+
+# Only the lines this commit ADDS (not the whole history).
+added="$(git diff --cached -U0 --no-color --no-ext-diff | grep '^+' | grep -v '^+++' || true)"
+
+if printf '%s\n' "$added" | grep -q -F -f "$patterns"; then
+  echo "pre-commit: BLOCKED - the staged changes contain a forbidden value." >&2
+  echo "Files involved:" >&2
+  git diff --cached --name-only --diff-filter=ACMR -z |
+    xargs -0 -r grep -l -F -f "$patterns" -- 2>/dev/null | sed 's/^/  - /' >&2 || true
+  echo "Remove the value (or unstage the file) and commit again." >&2
+  exit 1
+fi
+
+exit 0
