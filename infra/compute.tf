@@ -77,7 +77,11 @@ resource "aws_instance" "node" {
     # Canonical publishes a new AMI every few weeks. Without this, Terraform
     # would want to REPLACE the instance (and wipe the lab) each time.
     # Upgrades happen on purpose, not as a side effect.
-    ignore_changes = [ami]
+    # associate_public_ip_address: while the node is stopped AWS reports no
+    # public IP and the provider reads "false", which would force a REPLACE.
+    # The setting persists on the network interface: every start gets a new
+    # public IP. So Terraform must not act on what it sees while stopped.
+    ignore_changes = [ami, associate_public_ip_address]
   }
 }
 
