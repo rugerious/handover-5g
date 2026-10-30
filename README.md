@@ -34,6 +34,7 @@ Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks
   - merge to `main` → `apply` of exactly the planned change, **only after a human approves** the `production` environment.
 - The apply role can manage only `handover-*` IAM resources and **cannot modify its own permissions**.
 - Dependabot keeps actions, Python, Docker and Terraform dependencies current.
+- A **pre-commit hook** (`.githooks/pre-commit`) blocks any commit that adds the AWS account ID or other listed values. The values live outside the repo, so the hook itself reveals nothing. Every PR also carries a checklist (README, plan read, no identifiers).
 
 **Network and node**
 - One VPC and public subnet, **no NAT gateway** (it would cost more than the whole lab budget).
@@ -72,6 +73,7 @@ Several ideas come from projects in the OCUDU and srsRAN community (NIST O-RAN T
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
 | `labs/` | Kubernetes learning labs |
 | `.github/` | CI workflows, Dependabot, pull request checklist |
+| `.githooks/` | Local git hooks (enable with `git config core.hooksPath .githooks`) |
 
 ## Licence
 
