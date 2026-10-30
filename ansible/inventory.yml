@@ -1,0 +1,13 @@
+# The lab node, reached through AWS Systems Manager: no SSH, no IP address.
+# Commands go through Session Manager; files go through the private S3
+# transfer bucket (infra/transfer.tf). Nothing here is secret.
+all:
+  hosts:
+    handover-node-1:
+      ansible_aws_ssm_instance_id: i-01a352f99cc22979b
+  vars:
+    ansible_connection: amazon.aws.aws_ssm
+    ansible_aws_ssm_region: eu-west-2
+    ansible_aws_ssm_bucket_name: handover-ssm-transfer-93c3628df57676cf82277b4f26
+    ansible_aws_ssm_s3_addressing_style: virtual
+    ansible_python_interpreter: /usr/bin/python3
