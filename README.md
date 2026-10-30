@@ -52,6 +52,7 @@ Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks
 - Installed by an **Ansible playbook over SSM**: k3s pinned to `v1.35.9+k3s1`, the SCTP kernel module (5G's N2 transport) loaded and persistent. Running it a second time changes nothing.
 - **Secrets encrypted at rest**, admin kubeconfig readable by root only, no ingress or load balancer.
 - The Kubernetes API is **not exposed**: `kubectl` on the laptop goes through an SSM port-forward that exists only while it's open.
+- Daily start/stop, costs and rebuild steps are in the [runbook](docs/runbook.md). The kubeconfig comes from one playbook (`ansible/kubeconfig.yml`).
 
 ## Planned architecture
 
@@ -69,7 +70,8 @@ Several ideas come from projects in the OCUDU and srsRAN community (NIST O-RAN T
 | Path | What |
 |---|---|
 | `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute, Ansible transfer bucket |
-| `ansible/` | Inventory over SSM and the k3s playbook |
+| `ansible/` | Inventory over SSM, the k3s playbook and the kubeconfig playbook |
+| `docs/` | Runbook: daily routine, costs, rebuild |
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
 | `labs/` | Kubernetes learning labs |
 | `.github/` | CI workflows, Dependabot, pull request checklist |
