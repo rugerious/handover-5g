@@ -1,0 +1,116 @@
+# Prepares the Handover lab node: SCTP for 5G, then single-node k3s.
+# Run from the ansible/ folder:  ansible-playbook k3s.yml
+# Safe to run again: it only changes what is not already as described.
+
+- name: Prepare the Handover lab node
+  hosts: handover-node-1
+  become: true
+
+  vars:
+    # Pinned. Matches kubectl 1.35.9 on the laptop. Upgrade = change this line.
+    k3s_version: "v1.35.9+k3s1"
+
+  tasks:
+    - name: Refuse to run with a placeholder or unexpected k3s version
+      ansible.builtin.assert:
+        that: k3s_version is match('^v1\.35\.[0-9]+\+k3s[0-9]+$')
+        fail_msg: "k3s_version '{{ k3s_version }}' is not a pinned v1.35 release"
+        quiet: true
+
+    # -----------------------------------------------------------------------
+    # SCTP: transport for the 5G N2 interface (gNB <-> AMF)
+    # -----------------------------------------------------------------------
+    - name: Load SCTP at every boot
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/sctp.conf
+        content: "sctp\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Check whether SCTP is loaded now
+      ansible.builtin.command: grep -q '^sctp ' /proc/modules
+      register: sctp_loaded
+      changed_when: false
+      failed_when: false
+
+    - name: Load SCTP now
+      ansible.builtin.command: modprobe sctp
+      when: sctp_loaded.rc != 0
+      changed_when: true
+
+    # -----------------------------------------------------------------------
+    # k3s configuration (written before the install, so the first start uses it)
+    # -----------------------------------------------------------------------
+    - name: k3s configuration folder
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: k3s server configuration
+      ansible.builtin.copy:
+        dest: /etc/rancher/k3s/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          # Managed by Ansible (ansible/k3s.yml). Edit there, not here.
+          write-kubeconfig-mode: "0600"   # admin kubeconfig readable by root only
+          secrets-encryption: true        # Secrets encrypted at rest on disk
+          disable:
+            - traefik                     # no ingress: access is via SSM port-forward
+            - servicelb                   # no LoadBalancer services needed
+      register: k3s_config
+
+    # -----------------------------------------------------------------------
+    # Install k3s at the pinned version
+    # -----------------------------------------------------------------------
+    - name: Download the k3s install script
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /usr/local/bin/k3s-install.sh
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Check which k3s version is installed (if any)
+      ansible.builtin.command: /usr/local/bin/k3s --version
+      register: k3s_installed
+      changed_when: false
+      failed_when: false
+
+    - name: Install k3s (or move to the pinned version)
+      ansible.builtin.command: /usr/local/bin/k3s-install.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+      when: k3s_version not in (k3s_installed.stdout | default(''))
+      changed_when: true
+
+    - name: Restart k3s if only its configuration changed
+      ansible.builtin.systemd_service:
+        name: k3s
+        state: restarted
+      when:
+        - k3s_config.changed
+        - k3s_version in (k3s_installed.stdout | default(''))
+
+    - name: k3s starts at boot and is running
+      ansible.builtin.systemd_service:
+        name: k3s
+        enabled: true
+        state: started
+
+    - name: Wait until the node is Ready (up to 5 minutes)
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get nodes --no-headers
+      register: nodes
+      until: "' Ready ' in nodes.stdout"
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Show the node
+      ansible.builtin.debug:
+        var: nodes.stdout_lines
