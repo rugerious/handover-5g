@@ -13,7 +13,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | Phase | What | Hours | Status |
 |---|---|---|---|
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
-| 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | 🚧 1.1–1.3 done |
+| 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | 🚧 1.1–1.4 done (k3s running) |
 | 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | ⏳ |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
@@ -41,6 +41,16 @@ Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks
 - `m7i.xlarge` Ubuntu 24.04 node with an encrypted disk and **IMDSv2 only**.
 - Shell access through **SSM Session Manager**: no SSH key, no open port.
 - **Stops itself every night at 23:00** (EventBridge Scheduler), so a forgotten session costs one evening, not a month.
+- Terraform ignores attributes that only *look* different while the node is stopped. A plan review caught it wanting to replace the node for that reason, before anything was applied.
+
+**Operator access (no SSH, no access keys)**
+- The laptop signs in with `aws login`: browser sign-in with MFA, temporary credentials that expire within 12 hours. No access key exists for this project.
+- Ansible reaches the node through SSM. Files travel through a private S3 bucket (HTTPS only, no versioning, everything deleted after 1 day) using short-lived presigned links, so the node itself has no S3 permissions.
+
+**Kubernetes (k3s) on the node**
+- Installed by an **Ansible playbook over SSM**: k3s pinned to `v1.35.9+k3s1`, the SCTP kernel module (5G's N2 transport) loaded and persistent. Running it a second time changes nothing.
+- **Secrets encrypted at rest**, admin kubeconfig readable by root only, no ingress or load balancer.
+- The Kubernetes API is **not exposed**: `kubectl` on the laptop goes through an SSM port-forward that exists only while it's open.
 
 ## Planned architecture
 
@@ -57,10 +67,11 @@ Several ideas come from projects in the OCUDU and srsRAN community (NIST O-RAN T
 
 | Path | What |
 |---|---|
-| `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute |
+| `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute, Ansible transfer bucket |
+| `ansible/` | Inventory over SSM and the k3s playbook |
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
 | `labs/` | Kubernetes learning labs |
-| `.github/` | CI workflows and Dependabot |
+| `.github/` | CI workflows, Dependabot, pull request checklist |
 
 ## Licence
 
