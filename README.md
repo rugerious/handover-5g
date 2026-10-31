@@ -14,7 +14,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 |---|---|---|---|
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
-| 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | ⏭️ next |
+| 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | 🚧 2.1a versions pinned |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
@@ -72,6 +72,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 | `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute, Ansible transfer bucket |
 | `ansible/` | Inventory over SSM, the k3s playbook and the kubeconfig playbook |
 | `docs/` | Runbook: daily routine, costs, rebuild |
+| `versions.yaml` | Every version the lab runs (OCUDU, srsUE, Open5GS, k3s, tools), pinned to exact commits |
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
 | `labs/` | Kubernetes learning labs |
 | `.github/` | CI workflows, Dependabot, pull request checklist |
