@@ -16,8 +16,13 @@ FROM ubuntu:${OS_VERSION} AS build
 ARG MARCH=native
 ENV DEBIAN_FRONTEND=noninteractive
 COPY docker/scripts/ /src/docker/scripts/
+# ZeroMQ is in the script's "extra" list, not "build": install it explicitly,
+# or CMake does not find it and the gNB compiles silently without the ZMQ radio.
+# The script clears the apt lists, hence the second apt-get update.
 RUN apt-get update \
     && /src/docker/scripts/install_dependencies.sh build \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libzmq3-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY . /src
 RUN cmake -S /src -B /src/build -DCMAKE_BUILD_TYPE=Release \
@@ -30,6 +35,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY docker/scripts/ /tmp/scripts/
 RUN apt-get update \
     && /tmp/scripts/install_dependencies.sh run \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libzmq5 \
     && rm -rf /var/lib/apt/lists/* /tmp/scripts
 COPY --from=build /src/build/apps/gnb/gnb /usr/local/bin/gnb
 # Fail the build now, not at runtime: every library present, ZeroMQ linked in
