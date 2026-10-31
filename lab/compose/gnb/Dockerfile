@@ -30,7 +30,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY docker/scripts/ /tmp/scripts/
 RUN apt-get update \
     && /tmp/scripts/install_dependencies.sh run \
-    && apt-get install -y --no-install-recommends iproute2 \
     && rm -rf /var/lib/apt/lists/* /tmp/scripts
 COPY --from=build /src/build/apps/gnb/gnb /usr/local/bin/gnb
 # Fail the build now, not at runtime: every library present, ZeroMQ linked in
