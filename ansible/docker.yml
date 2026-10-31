@@ -1,0 +1,57 @@
+# Docker on the lab node, for the Docker Compose test of the 5G stack
+# (Phase 2: prove the 5G works before moving it to Kubernetes).
+# Run from the ansible/ folder:  ansible-playbook docker.yml
+# Safe to run again. k3s keeps its own runtime (containerd); both coexist.
+
+- name: Docker on the Handover lab node
+  hosts: handover-node-1
+  become: true
+
+  tasks:
+    - name: Docker engine, Compose v2 and BuildKit (Ubuntu packages)
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - docker-buildx       # BuildKit: OCUDU's Dockerfile uses RUN --mount
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Docker daemon settings (rotate container logs)
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": { "max-size": "10m", "max-file": "3" }
+          }
+      register: daemon_json
+
+    - name: Restart Docker if its settings changed
+      ansible.builtin.systemd_service:
+        name: docker
+        state: restarted
+      when: daemon_json.changed
+
+    - name: Docker starts at boot and is running
+      ansible.builtin.systemd_service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Check Docker, Compose and BuildKit
+      ansible.builtin.shell: |
+        set -e
+        docker version --format 'docker {{ "{{" }}.Server.Version{{ "}}" }}'
+        docker compose version --short | sed 's/^/compose /'
+        docker buildx version | awk '{print "buildx " $2}'
+      changed_when: false
+      register: docker_versions
+
+    - name: Show versions
+      ansible.builtin.debug:
+        var: docker_versions.stdout_lines
