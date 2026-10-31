@@ -18,12 +18,13 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
-| 5 | Multi-UE + radio degradation injector; automated acceptance with public reports | 11–14 | ⏳ |
-| 6 | AI ops assistant: Isolation Forest detects, LLM explains, MCP tools (read / dry-run / open PR only), fix by pull request, incident in [CloudOps](https://github.com/rugerious/cloudops-aws-platform) | 13–17 | ⏳ |
+| 5 | Multi-UE, a second cell and a radio degradation injector; automated acceptance with public reports | 12–16 | ⏳ |
+| 6a | AI ops assistant: Isolation Forest detects, LLM explains, MCP tools (read / dry-run / open PR only), fix by pull request, incident in [CloudOps](https://github.com/rugerious/cloudops-aws-platform) | 13–17 | ⏳ |
+| 6b | Energy savings: a model learns the daily traffic pattern; a human approves the sleep policy by PR, the controller applies it within limits and rolls back if KPIs drop | 6–8 | ⏳ |
 | 7 | Demo video and write-up | 4–6 | ⏳ |
-| | **Total** | **67–88** | |
+| | **Total** | **74–98** | |
 
-Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks. That includes about 6 hours added on 28 Oct 2026 after reviewing 14 OCUDU community projects (multi-UE, radio degradation, NetworkPolicies, public reports, MCP tools).
+Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks.
 
 ## What is built so far
 
