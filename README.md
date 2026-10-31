@@ -64,8 +64,6 @@ Estimated effort is **67–88 hours** at 8–10 hours a week, about 8–10 weeks
 - **Acceptance:** pass/fail reports with KPI thresholds for every deployment, platform and radio fault injection, reports published on GitHub Pages
 - **AI ops:** classic ML detects, an LLM explains, an MCP server exposes read, dry-run and open-PR tools; nothing is applied without a human merge
 
-Several ideas come from projects in the OCUDU and srsRAN community (NIST O-RAN Testbed Automation, Tiny_Twin-OCUDU, the OCUDU dApp platform, SUSE's OCUDU reference architecture).
-
 ## Repository layout
 
 | Path | What |
@@ -77,6 +75,10 @@ Several ideas come from projects in the OCUDU and srsRAN community (NIST O-RAN T
 | `labs/` | Kubernetes learning labs |
 | `.github/` | CI workflows, Dependabot, pull request checklist |
 | `.githooks/` | Local git hooks (enable with `git config core.hooksPath .githooks`) |
+
+## Acknowledgements
+
+Inspired in part by public work in the OCUDU and srsRAN community, including NIST's O-RAN testbed automation and SUSE's OCUDU reference architecture.
 
 ## Licence
 
