@@ -7,7 +7,7 @@ ran:
     repo: https://gitlab.com/ocudu/ocudu.git
     tag: release_26_10
     commit: e0db566aac6e6376ddd60e83c84f58698fcc4d70   # 30 Sep 2026
-    docker_target: runtime-lean   # no UHD, no DPDK: ZeroMQ radio only
+    dockerfile: lab/compose/gnb/Dockerfile   # target gnb, ZeroMQ only (no UHD, DPDK, ROHC)
     radio: zmq                    # simulated radio, no antennas
   srsue:                       # simulated phone (srsRAN 4G)
     repo: https://github.com/srsran/srsRAN_4G.git
