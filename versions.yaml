@@ -1,0 +1,41 @@
+# Every version the lab runs, in one place. Change it here first, then in the
+# code that uses it. Commits pin what a tag points to today, so a moved or
+# re-created tag can never change what we build.
+
+ran:
+  ocudu:                       # gNB (Linux Foundation, formerly srsRAN Project)
+    repo: https://gitlab.com/ocudu/ocudu.git
+    tag: release_26_10
+    commit: e0db566aac6e6376ddd60e83c84f58698fcc4d70   # 30 Sep 2026
+    docker_target: runtime-lean   # no UHD, no DPDK: ZeroMQ radio only
+    radio: zmq                    # simulated radio, no antennas
+  srsue:                       # simulated phone (srsRAN 4G)
+    repo: https://github.com/srsran/srsRAN_4G.git
+    tag: release_25_10
+    commit: 6bcbd9e5bf8686aa7085202cd847c5ddd64a9c16
+    build_flags: [ENABLE_ZEROMQ=ON, ENABLE_RF_PLUGINS=OFF]
+
+core:
+  open5gs:                     # 5G core, built by OCUDU's docker/open5gs
+    version: v2.7.6
+
+cell:                          # first lab cell (band 3 FDD, srsUE-compatible)
+  plmn: "00101"
+  tac: 7
+  band: 3
+  dl_arfcn: 368500
+  bandwidth_mhz: 10            # 10 MHz: less CPU than 20 MHz, proven with ZMQ
+  scs_khz: 15
+
+platform:
+  k3s: v1.35.9+k3s1
+  kubectl: v1.35.9
+  helm: v4.3.1
+  ubuntu: "24.04"              # node OS (kernel 7.0 HWE)
+
+tooling:
+  terraform: 1.16.6
+  aws_provider: 6.70.0
+  ansible_core: 2.21.5
+  amazon_aws_collection: 12.0.0
+  aws_cli: 2.39.3
