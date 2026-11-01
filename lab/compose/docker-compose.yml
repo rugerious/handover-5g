@@ -1,7 +1,9 @@
 # Phase 2 Compose test: Open5GS core + OCUDU gNB + srsUE over ZeroMQ (simulated
 # radio), on the lab node. Proves the 5G works before it moves to Kubernetes.
-# Based on OCUDU's docker/docker-compose.yml (release_26_10), with less privilege:
-# no published ports, gNB not privileged (no USB radio), UE gets only TUN + NET_ADMIN.
+# Based on OCUDU's docker/docker-compose.yml (release_26_10). No published ports.
+# This is the configuration that first attached a UE (1 Nov 2026). The gNB and
+# UE still run privileged, as in that test; privileges are cut down to the
+# minimum when the lab moves to k3s (step 2.2), where each one is tested.
 #
 # On the node:  cd /opt/handover/repo/lab/compose && docker compose up -d
 # Versions: see versions.yaml at the repo root.
@@ -22,6 +24,9 @@ services:
       - open5gs.env
     privileged: true          # the UPF creates its TUN device and NAT rules
     command: 5gc -c open5gs-5gc.yml
+    volumes:
+      # Our template replaces OCUDU's: the AMF serves TAC 7 only (see README)
+      - ./open5gs/open5gs-5gc.yml.in:/open5gs/open5gs-5gc.yml.in:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.20 7777"]
       interval: 3s
@@ -34,6 +39,8 @@ services:
   gnb:
     container_name: ocudu_gnb
     image: handover/ocudu-gnb:release_26_10   # built from gnb/Dockerfile (see README)
+    privileged: true          # as tested; to be reduced in step 2.2
+    tty: true                 # the gNB console expects a terminal
     cap_add:
       - SYS_NICE                # real-time scheduling for the PHY threads
     volumes:
@@ -52,6 +59,7 @@ services:
     image: handover/srsue:release_25_10
     build:
       context: srsue
+    privileged: true          # as tested; to be reduced in step 2.2
     cap_add:
       - NET_ADMIN               # create tun_srsue and its routes
       - SYS_NICE
@@ -63,9 +71,9 @@ services:
     command: srsue /ue-zmq.conf
     depends_on:
       - gnb
-    networks:
-      ran:
-        ipv4_address: 10.53.1.4
+    # Same network namespace as the gNB, so the ZeroMQ "radio" runs over
+    # 127.0.0.1, exactly as in the official srsUE tutorial.
+    network_mode: "service:gnb"
 
 volumes:
   gnb-logs:
