@@ -41,7 +41,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 **Network and node**
 - One VPC and public subnet, **no NAT gateway** (it would cost more than the whole lab budget).
 - The node's security group has **zero inbound rules**; outbound is limited to ports 80 and 443. Rejected traffic is recorded with VPC Flow Logs.
-- `m7i.xlarge` Ubuntu 24.04 node with an encrypted disk and **IMDSv2 only**.
+- `c7i.2xlarge` (8 vCPU) Ubuntu 24.04 node with an encrypted disk and **IMDSv2 only**.
 - Shell access through **SSM Session Manager**: no SSH key, no open port.
 - **Stops itself every night at 23:00** (EventBridge Scheduler), so a forgotten session costs one evening, not a month.
 - Terraform ignores attributes that only *look* different while the node is stopped. A plan review caught it wanting to replace the node for that reason, before anything was applied.
