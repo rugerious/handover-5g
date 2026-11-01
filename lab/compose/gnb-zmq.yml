@@ -1,7 +1,8 @@
-# OCUDU gNB for the Compose test: one FDD cell in band 3, 10 MHz, 15 kHz SCS,
-# ZeroMQ radio towards srsUE. Based on OCUDU configs/gnb_rf_b210_fdd_srsUE.yml
-# (srsUE-compatible PDCCH settings), radio swapped from USRP B210 to ZMQ and
-# bandwidth from 20 to 10 MHz (less CPU). Values must match ue-zmq.conf.
+# OCUDU gNB for the Compose test: one FDD cell in band 3, 20 MHz, 15 kHz SCS,
+# ZeroMQ radio towards srsUE. Follows the official srsUE ZeroMQ example
+# (gnb_zmq.yaml) except the gains: OCUDU's ZMQ driver requires 0 dB or less.
+# 20 MHz on purpose: at 10 MHz large uplink messages failed CRC and the attach
+# never completed. Values must match ue-zmq.conf.
 
 cu_cp:
   amf:
@@ -17,16 +18,17 @@ cu_cp:
 
 ru_sdr:
   device_driver: zmq
-  # gNB transmits on its own :2000, receives from the UE's :2001
-  device_args: tx_port=tcp://10.53.1.3:2000,rx_port=tcp://10.53.1.4:2001,base_srate=11.52e6
-  srate: 11.52
-  tx_gain: 75
-  rx_gain: 75
+  # gNB transmits on :2000, receives from the UE's :2001. The UE shares this
+  # container's network namespace, so both ends are 127.0.0.1.
+  device_args: tx_port=tcp://127.0.0.1:2000,rx_port=tcp://127.0.0.1:2001,base_srate=23.04e6
+  srate: 23.04
+  tx_gain: 0
+  rx_gain: 0
 
 cell_cfg:
   dl_arfcn: 368500
   band: 3
-  channel_bandwidth_MHz: 10
+  channel_bandwidth_MHz: 20
   common_scs: 15
   plmn: "00101"
   tac: 7
@@ -36,7 +38,7 @@ cell_cfg:
       dci_format_0_1_and_1_1: false
     common:
       ss0_index: 0
-      coreset0_index: 6       # 10 MHz (the 20 MHz example uses 12)
+      coreset0_index: 12      # 20 MHz, as in the official example
   prach:
     prach_config_index: 1
   pdsch:
@@ -46,7 +48,7 @@ cell_cfg:
 
 log:
   filename: /tmp/gnb.log
-  all_level: warning
+  all_level: warning          # "info" shows every PUSCH CRC and SINR (debugging)
 
 pcap:
   ngap_enable: true           # N2 signalling capture, for Wireshark
