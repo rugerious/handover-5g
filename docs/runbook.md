@@ -41,7 +41,7 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
 
 ## Costs
 
-- Node running: about $0.23/hour (m7i.xlarge) plus $0.005/hour for its public IP.
+- Node running: about $0.40/hour (c7i.2xlarge, 8 vCPU) plus $0.005/hour for its public IP.
 - Disk: about $3.50/month, charged even while the node is stopped.
 - Budget `handover-monthly`: $30, email alerts at 40% and 100% (actual) and 100% (forecast).
 

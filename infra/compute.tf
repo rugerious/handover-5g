@@ -2,9 +2,9 @@
 # Manager (no SSH key, no inbound port), stopped automatically every night.
 
 variable "instance_type" {
-  description = "x86 size for the lab node (4 vCPU / 16 GiB; revisit at step 5.1 multi-UE)"
+  description = "x86 size for the lab node (8 vCPU / 16 GiB): OCUDU keeps 3 CPUs spare, the ZMQ attach needs 5+ (OCUDU #571)"
   type        = string
-  default     = "m7i.xlarge"
+  default     = "c7i.2xlarge"
 }
 
 # Latest Ubuntu 24.04 LTS (amd64, gp3) published by Canonical, via the public
