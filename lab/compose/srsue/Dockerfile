@@ -3,6 +3,9 @@
 
 FROM ubuntu:22.04 AS build
 ARG SRSRAN_4G_COMMIT=6bcbd9e5bf8686aa7085202cd847c5ddd64a9c16
+# srsRAN 4G picks SIMD flags by running test code on the BUILD machine, so a CI
+# build would match the runner's CPU. Fix the target instead: x86-64-v3 (AVX2).
+ARG GCC_ARCH=x86-64-v3
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential cmake git ca-certificates \
       libfftw3-dev libmbedtls-dev libboost-program-options-dev \
@@ -14,6 +17,8 @@ RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release \
       -DENABLE_ZEROMQ=ON -DENABLE_RF_PLUGINS=OFF \
       -DENABLE_UHD=OFF -DENABLE_BLADERF=OFF -DENABLE_SOAPYSDR=OFF \
       -DENABLE_GUI=OFF \
+      -DAUTO_DETECT_ISA=OFF -DGCC_ARCH=${GCC_ARCH} \
+      -DHAVE_SSE=ON -DHAVE_AVX=ON -DHAVE_AVX2=ON -DHAVE_FMA=ON \
     && cmake --build /build --target srsue -j"$(nproc)"
 
 FROM ubuntu:22.04

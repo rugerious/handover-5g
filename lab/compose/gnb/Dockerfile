@@ -13,7 +13,9 @@
 ARG OS_VERSION=26.04
 
 FROM ubuntu:${OS_VERSION} AS build
-ARG MARCH=native
+# Portable CPU target (AVX2), not "native": CI builds on a different CPU than
+# the node, and a "native" binary can crash with "illegal instruction" elsewhere.
+ARG MARCH=x86-64-v3
 ENV DEBIAN_FRONTEND=noninteractive
 COPY docker/scripts/ /src/docker/scripts/
 # ZeroMQ is in the script's "extra" list, not "build": install it explicitly,
