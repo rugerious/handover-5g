@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app.kubernetes.io/name: ran
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  gnb.yml: |
+{{ tpl (.Files.Get "files/gnb.yml") . | indent 4 }}
+  ue.conf: |
+{{ .Files.Get "files/ue.conf" | indent 4 }}

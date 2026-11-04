@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: ran
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate               # never two gNBs with the same cell at once
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ran
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ran
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        # restart the pod when the configuration changes
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: gnb
+          image: "{{ .Values.gnb.image.repository }}:{{ .Values.gnb.image.tag }}"
+          # The AMF link must bind to this pod's own IP, known only at start:
+          # fill it into the config, then run the gNB.
+          command: ["/bin/sh", "-c"]
+          args:
+            - sed "s/__POD_IP__/${POD_IP}/" /config/gnb.yml > /tmp/gnb.yml && exec gnb -c /tmp/gnb.yml
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          tty: true                  # the gNB console expects a terminal
+          securityContext:
+            {{- toYaml .Values.gnb.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: gnb-tmp
+              mountPath: /tmp
+        - name: srsue
+          image: "{{ .Values.ue.image.repository }}:{{ .Values.ue.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - sleep {{ .Values.ue.startDelaySeconds }} && exec srsue /config/ue.conf
+          securityContext:
+            {{- toYaml .Values.ue.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: ue-tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-config
+        - name: gnb-tmp
+          emptyDir: {}
+        - name: ue-tmp
+          emptyDir: {}

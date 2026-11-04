@@ -1,0 +1,22 @@
+# Handover lab RAN: OCUDU gNB + srsUE in ONE pod, so the ZeroMQ "radio" runs
+# over 127.0.0.1, exactly as in the Compose lab (lab/compose) that attached
+# on 1 Nov 2026. Images are built by .github/workflows/ran-images.yml.
+
+amf:
+  addr: 10.43.38.12          # Open5GS AMF NGAP service, fixed in deploy/core/open5gs-values.yaml
+
+gnb:
+  image:
+    repository: ghcr.io/rugerious/handover-5g/ocudu-gnb
+    tag: release_26_10-sha-4b412c0   # immutable tag from the main build of PR #30
+  # As tested in Compose; reduced to the minimum in step 2.2d.
+  securityContext:
+    privileged: true
+
+ue:
+  image:
+    repository: ghcr.io/rugerious/handover-5g/srsue
+    tag: release_25_10-sha-4b412c0
+  startDelaySeconds: 15      # gNB first, then the UE (Compose waited 12 s)
+  securityContext:
+    privileged: true         # creates tun_srsue; reduced in step 2.2d
