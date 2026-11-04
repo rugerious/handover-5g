@@ -1,0 +1,53 @@
+# OCUDU gNB for the k3s lab: same cell as lab/compose/gnb-zmq.yml (band 3,
+# 20 MHz, 15 kHz SCS, ZeroMQ radio), with the core reached through k3s.
+# __POD_IP__ is filled in at container start (see templates/deployment.yaml).
+
+cu_cp:
+  amf:
+    addrs: {{ .Values.amf.addr }}   # Open5GS AMF NGAP service (SCTP)
+    port: 38412
+    bind_addrs: __POD_IP__
+    supported_tracking_areas:
+      - tac: 7
+        plmn_list:
+          - plmn: "00101"
+            tai_slice_support_list:
+              - sst: 1
+  inactivity_timer: 7200    # 2 h before releasing an idle UE: srsUE does not come back from idle (official recipe)
+
+ru_sdr:
+  device_driver: zmq
+  # gNB transmits on :2000, receives from the UE's :2001 (same pod: 127.0.0.1)
+  device_args: tx_port=tcp://127.0.0.1:2000,rx_port=tcp://127.0.0.1:2001,base_srate=23.04e6
+  srate: 23.04
+  tx_gain: 0
+  rx_gain: 0
+
+cell_cfg:
+  dl_arfcn: 368500
+  band: 3
+  channel_bandwidth_MHz: 20
+  common_scs: 15
+  plmn: "00101"
+  tac: 7
+  pdcch:
+    dedicated:
+      ss2_type: common
+      dci_format_0_1_and_1_1: false
+    common:
+      ss0_index: 0
+      coreset0_index: 12
+  prach:
+    prach_config_index: 1
+  pdsch:
+    mcs_table: qam64
+  pusch:
+    mcs_table: qam64
+
+log:
+  filename: /tmp/gnb.log
+  all_level: warning
+
+pcap:
+  ngap_enable: true
+  ngap_filename: /tmp/gnb_ngap.pcap
