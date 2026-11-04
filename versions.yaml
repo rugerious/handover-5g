@@ -16,8 +16,13 @@ ran:
     build_flags: [ENABLE_ZEROMQ=ON, ENABLE_RF_PLUGINS=OFF]
 
 core:
-  open5gs:                     # 5G core, built by OCUDU's docker/open5gs
+  open5gs:                     # Compose lab (2.1): built by OCUDU's docker/open5gs
     version: v2.7.6
+  open5gs_k3s:                 # k3s lab (2.2): Gradiant community chart, one pod per function
+    chart: oci://registry-1.docker.io/gradiantcharts/open5gs
+    chart_version: 2.3.11
+    app_version: "2.8.0"       # image gradiant/open5gs:2.8.0
+    values: deploy/core/open5gs-values.yaml
 
 cell:                          # first lab cell (band 3 FDD, srsUE-compatible)
   plmn: "00101"

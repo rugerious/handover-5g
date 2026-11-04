@@ -1,0 +1,52 @@
+# Open5GS 5G SA core for the Handover lab on k3s: Gradiant's community chart,
+# one pod per network function. Chart and app versions: versions.yaml.
+# Install from the laptop (SSM tunnel open):
+#   helm upgrade --install open5gs oci://registry-1.docker.io/gradiantcharts/open5gs \
+#     --version 2.3.11 -n core --create-namespace -f deploy/core/open5gs-values.yaml
+
+# 5G SA only: the 4G parts (EPC) and roaming are off
+hss: { enabled: false }
+mme: { enabled: false }
+pcrf: { enabled: false }
+sgwc: { enabled: false }
+sgwu: { enabled: false }
+sepp: { enabled: false }
+webui: { enabled: false }       # subscribers come from "populate" below
+
+mongodb:
+  persistence:
+    enabled: true
+    size: 1Gi                   # k3s local-path disk; survives a node stop/start
+
+populate:
+  enabled: true
+  initCommands:
+    # Public srsRAN/OCUDU test subscriber (same as lab/compose/ue-zmq.conf)
+    - open5gs-dbctl add_ue_with_apn 001010123456780 00112233445566778899aabbccddeeff 63BFA50EE6523365FF14C1F45F88737D internet
+
+amf:
+  config:
+    guamiList:
+      - plmn_id: { mcc: "001", mnc: "01" }
+        amf_id: { region: 2, set: 1 }
+    taiList:
+      - plmn_id: { mcc: "001", mnc: "01" }
+        tac: [7]                # ONE TAC: srsUE cannot decode a multi-TAC list (bug 9)
+    plmnList:
+      - plmn_id: { mcc: "001", mnc: "01" }
+        s_nssai:
+          - sst: 1
+    networkName: Handover
+  services:
+    ngap:
+      clusterIP: 10.43.38.12    # fixed, so the gNB config can point at it (k3s services: 10.43.0.0/16)
+
+nrf:
+  config:
+    servingList:
+      - plmn_id: { mcc: "001", mnc: "01" }
+
+smf:
+  config:
+    pcrf:
+      enabled: false            # 4G policy function, not deployed
