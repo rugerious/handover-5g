@@ -14,6 +14,8 @@ sepp: { enabled: false }
 webui: { enabled: false }       # subscribers come from "populate" below
 
 mongodb:
+  image:
+    tag: "7.0"                  # NOT 8.x: MongoDB 8 refuses to start on kernel >= 6.19 (SERVER-121912); node runs 7.0
   persistence:
     enabled: true
     size: 1Gi                   # k3s local-path disk; survives a node stop/start
