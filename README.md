@@ -14,7 +14,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 |---|---|---|---|
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
-| 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | 🚧 2.2a RAN images built by CI |
+| 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | 🚧 2.2b 5G core on k3s |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
@@ -60,6 +60,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 - Open5GS core, OCUDU gNB and srsUE over a ZeroMQ simulated radio on the node: **a UE attaches, gets an IP and pings the core** (1 Nov 2026, 0% loss).
 - Three fixes, each found from logs and source code: OCUDU's CPU reservation (node moved to 8 vCPU), uplink failing at 10 MHz (now 20 MHz, as in the official example), and srsUE rejecting a multi-TAC Registration Accept (the core now serves one TAC). Details in [lab/compose](lab/compose/README.md).
 - **RAN images built by CI:** `.github/workflows/ran-images.yml` builds the OCUDU gNB and srsUE at the commits pinned in `versions.yaml` and publishes them to GHCR on merge (pull requests only build). Portable CPU target (AVX2), so an image built on GitHub's machines also runs on the node.
+- **5G core on k3s:** Open5GS 2.8 from the community Helm chart, one pod per network function (AMF, SMF, UPF, NRF, …) plus MongoDB; 5G SA only, AMF on a fixed address for the gNB, test subscriber loaded. Values in `deploy/core/`. MongoDB is pinned to 7.0: MongoDB 8 refuses to start on the node's kernel 7.0 (found from the pod's crash log).
 
 ## Planned architecture
 
@@ -78,6 +79,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 | `ansible/` | Inventory over SSM, the k3s playbook and the kubeconfig playbook |
 | `docs/` | Runbook: daily routine, costs, rebuild |
 | `lab/compose/` | Phase 2 first test: Open5GS + OCUDU gNB + srsUE over ZeroMQ in Docker Compose |
+| `deploy/` | Kubernetes deployments: Helm values for the 5G core (`core/`) |
 | `versions.yaml` | Every version the lab runs (OCUDU, srsUE, Open5GS, k3s, tools), pinned to exact commits |
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
 | `labs/` | Kubernetes learning labs |
