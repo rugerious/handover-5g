@@ -24,8 +24,12 @@ cell:                          # first lab cell (band 3 FDD, srsUE-compatible)
   tac: 7
   band: 3
   dl_arfcn: 368500
-  bandwidth_mhz: 10            # 10 MHz: less CPU than 20 MHz, proven with ZMQ
+  bandwidth_mhz: 20            # as in the official srsUE ZMQ example (10 MHz uplink failed, 1 Nov)
   scs_khz: 15
+
+images:                        # built by .github/workflows/ran-images.yml, pushed on main
+  registry: ghcr.io/rugerious/handover-5g    # ocudu-gnb, srsue
+  cpu_target: x86-64-v3        # AVX2: CI builds on a different CPU than the node
 
 platform:
   k3s: v1.35.9+k3s1

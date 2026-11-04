@@ -1,5 +1,5 @@
 # Handover: 5G Operations Lab
-![terraform](https://github.com/rugerious/handover-5g/actions/workflows/terraform.yml/badge.svg) ![kpi-exporter image](https://github.com/rugerious/handover-5g/actions/workflows/kpi-exporter.yml/badge.svg)
+![terraform](https://github.com/rugerious/handover-5g/actions/workflows/terraform.yml/badge.svg) ![kpi-exporter image](https://github.com/rugerious/handover-5g/actions/workflows/kpi-exporter.yml/badge.svg) ![ran images](https://github.com/rugerious/handover-5g/actions/workflows/ran-images.yml/badge.svg)
 
 > In RAN, a handover moves a call to a new cell without dropping it.
 > This project is my handover from RAN to cloud.
@@ -14,7 +14,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 |---|---|---|---|
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
-| 2 | 5G workloads on Kubernetes: Open5GS + OCUDU gNB (official Helm chart) + srsUE over ZeroMQ | 12–16 | 🚧 2.1d first UE attach + ping (Compose) |
+| 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | 🚧 2.2a RAN images built by CI |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
@@ -59,6 +59,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 **5G lab (Docker Compose, Phase 2 first test)**
 - Open5GS core, OCUDU gNB and srsUE over a ZeroMQ simulated radio on the node: **a UE attaches, gets an IP and pings the core** (1 Nov 2026, 0% loss).
 - Three fixes, each found from logs and source code: OCUDU's CPU reservation (node moved to 8 vCPU), uplink failing at 10 MHz (now 20 MHz, as in the official example), and srsUE rejecting a multi-TAC Registration Accept (the core now serves one TAC). Details in [lab/compose](lab/compose/README.md).
+- **RAN images built by CI:** `.github/workflows/ran-images.yml` builds the OCUDU gNB and srsUE at the commits pinned in `versions.yaml` and publishes them to GHCR on merge (pull requests only build). Portable CPU target (AVX2), so an image built on GitHub's machines also runs on the node.
 
 ## Planned architecture
 
@@ -86,6 +87,8 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 ## Acknowledgements
 
 Inspired in part by public work in the OCUDU and srsRAN community, including NIST's O-RAN testbed automation and SUSE's OCUDU reference architecture.
+
+Built with Claude (Anthropic) as a pair programmer. Every change was reviewed, tested on the node and merged by me.
 
 ## Licence
 
