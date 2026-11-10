@@ -57,6 +57,8 @@ spec:
               readOnly: true
             - name: ue-tmp
               mountPath: /tmp
+            - name: dev-tun          # the one device the UE needs, instead of privileged
+              mountPath: /dev/net/tun
       volumes:
         - name: config
           configMap:
@@ -65,3 +67,7 @@ spec:
           emptyDir: {}
         - name: ue-tmp
           emptyDir: {}
+        - name: dev-tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice

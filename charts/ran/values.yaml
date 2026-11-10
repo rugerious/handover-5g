@@ -9,14 +9,24 @@ gnb:
   image:
     repository: ghcr.io/rugerious/handover-5g/ocudu-gnb
     tag: release_26_10-sha-4b412c0   # immutable tag from the main build of PR #30
-  # As tested in Compose; reduced to the minimum in step 2.2d.
+  # Least privilege (2.2d): only real-time scheduling for the radio threads.
   securityContext:
-    privileged: true
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+      add: [SYS_NICE]
 
 ue:
   image:
     repository: ghcr.io/rugerious/handover-5g/srsue
     tag: release_25_10-sha-4b412c0
   startDelaySeconds: 15      # gNB first, then the UE (Compose waited 12 s)
+  # Least privilege (2.2d): create tun_srsue and its routes, real-time threads.
+  # The only device it gets is /dev/net/tun (see templates/deployment.yaml).
   securityContext:
-    privileged: true         # creates tun_srsue; reduced in step 2.2d
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+      add: [NET_ADMIN, SYS_NICE, NET_RAW]   # NET_RAW: ping, the test traffic of our "test phone"
