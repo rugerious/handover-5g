@@ -15,7 +15,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
 | 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | ✅ 10 Nov 2026 (~12 h) |
-| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
+| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | 🚧 3.1 Argo CD installed |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
 | 5 | Multi-UE, a second cell and a radio degradation injector; automated acceptance with public reports | 12–16 | ⏳ |
@@ -64,6 +64,9 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 - **5G RAN on k3s (our own Helm chart):** `charts/ran/` runs the OCUDU gNB and srsUE in one pod, linked by ZeroMQ over 127.0.0.1, with the images from GHCR. **The UE attaches to the core on k3s and pings it** (0% loss, 4 Nov 2026). The gNB waits 2 h before releasing an idle UE: srsUE cannot come back from idle, which first showed up as a ping that died 10 s after attach.
 - **RAN on least privilege:** the gNB and UE no longer run `privileged`. Each container drops every Linux capability and adds back only what it needs: the gNB `SYS_NICE` (real-time radio threads); the UE `NET_ADMIN` and `SYS_NICE` (its tunnel interface) plus `NET_RAW` (ping, its test traffic), and the single device `/dev/net/tun`. Verified from inside the running processes (`CapEff`) and with attach + ping. The core's UPF still runs privileged as the community chart ships it (to review).
 
+**GitOps (Phase 3)**
+- **Argo CD on k3s** (chart 10.11.6, v3.5.6, pinned in `versions.yaml`): no SSO, no notifications, no ingress. Its web page is reached like the Kubernetes API, through the SSM tunnel with `kubectl port-forward`; nothing is exposed to the internet. The admin password goes straight to the clipboard, never on screen.
+
 ## Planned architecture
 
 - **RAN + core:** OCUDU gNB (Linux Foundation, formerly srsRAN Project) and srsUE over ZeroMQ, Open5GS 5G core, packaged with Helm, every version pinned in one manifest
@@ -81,7 +84,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 | `ansible/` | Inventory over SSM, the k3s playbook and the kubeconfig playbook |
 | `docs/` | Runbook: daily routine, costs, rebuild |
 | `lab/compose/` | Phase 2 first test: Open5GS + OCUDU gNB + srsUE over ZeroMQ in Docker Compose |
-| `deploy/` | Kubernetes deployments: Helm values for the 5G core (`core/`) |
+| `deploy/` | Kubernetes deployments: Helm values for the 5G core (`core/`) and Argo CD (`argocd/`) |
 | `charts/ran/` | Our Helm chart: OCUDU gNB + srsUE in one pod over ZeroMQ |
 | `versions.yaml` | Every version the lab runs (OCUDU, srsUE, Open5GS, k3s, tools), pinned to exact commits |
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |

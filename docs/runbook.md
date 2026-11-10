@@ -17,11 +17,10 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
    aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-01a352f99cc22979b" \
      --query 'InstanceInformationList[].PingStatus' --output text   # repeat until: Online
    ```
-3. **Open the tunnel to the Kubernetes API** in a separate tab, and leave it open:
+3. **Open the tunnel to the Kubernetes API** in the background (one tab is enough; it closes after 20 min idle, just run it again):
    ```bash
-   aws ssm start-session --target i-01a352f99cc22979b \
-     --document-name AWS-StartPortForwardingSession \
-     --parameters 'portNumber=6443,localPortNumber=16443'
+   nohup aws ssm start-session --target i-01a352f99cc22979b --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["6443"],"localPortNumber":["16443"]}' > /tmp/tunnel.log 2>&1 < /dev/null &
+   sleep 8 && cat /tmp/tunnel.log    # expect: Waiting for connections...
    ```
 4. **Point kubectl at the lab** (this tab only; other tabs stay on the local k3d cluster):
    ```bash
@@ -29,10 +28,14 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
    kubectl get nodes
    ```
    No kubeconfig yet, or the node was rebuilt? `cd ansible && ansible-playbook kubeconfig.yml`
+5. **Argo CD web page** (optional), through the same tunnel; then open https://localhost:8080 (user `admin`, password in the password manager):
+   ```bash
+   nohup kubectl -n argocd port-forward svc/argocd-server 8080:443 > /tmp/argocd-pf.log 2>&1 < /dev/null &
+   ```
 
 ## End
 
-1. Close the tunnel: **Ctrl+C** in its tab.
+1. Close the tunnel and the Argo CD port-forward: `pkill -f AWS-StartPortForwardingSession; pkill -f 'port-forward svc/argocd-server'`
 2. **Stop the node** (the disk keeps everything):
    ```bash
    aws ec2 stop-instances --instance-ids i-01a352f99cc22979b --output text --query 'StoppingInstances[].CurrentState.Name'
