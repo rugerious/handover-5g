@@ -1,0 +1,12 @@
+# Argo CD for the Handover lab: the GitOps controller on k3s. Chart and app
+# versions: versions.yaml (gitops.argocd). No ingress: the UI is reached with
+# kubectl port-forward through the SSM tunnel, like the Kubernetes API.
+# Bootstrap install (from the laptop, tunnel open):
+#   helm upgrade --install argocd argo/argo-cd --version 10.11.6 \
+#     -n argocd --create-namespace -f deploy/argocd/values.yaml
+
+# Only what the lab needs: no SSO and no notifications (fewer pods to secure).
+dex:
+  enabled: false
+notifications:
+  enabled: false
