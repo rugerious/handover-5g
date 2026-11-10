@@ -14,7 +14,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 |---|---|---|---|
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
-| 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | 🚧 2.2d RAN on least privilege |
+| 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | ✅ 10 Nov 2026 (~12 h) |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ⏳ |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
@@ -56,7 +56,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 - The Kubernetes API is **not exposed**: `kubectl` on the laptop goes through an SSM port-forward that exists only while it's open.
 - Daily start/stop, costs and rebuild steps are in the [runbook](docs/runbook.md). The kubeconfig comes from one playbook (`ansible/kubeconfig.yml`).
 
-**5G lab (Docker Compose, Phase 2 first test)**
+**5G lab (Phase 2)**
 - Open5GS core, OCUDU gNB and srsUE over a ZeroMQ simulated radio on the node: **a UE attaches, gets an IP and pings the core** (1 Nov 2026, 0% loss).
 - Three fixes, each found from logs and source code: OCUDU's CPU reservation (node moved to 8 vCPU), uplink failing at 10 MHz (now 20 MHz, as in the official example), and srsUE rejecting a multi-TAC Registration Accept (the core now serves one TAC). Details in [lab/compose](lab/compose/README.md).
 - **RAN images built by CI:** `.github/workflows/ran-images.yml` builds the OCUDU gNB and srsUE at the commits pinned in `versions.yaml` and publishes them to GHCR on merge (pull requests only build). Portable CPU target (AVX2), so an image built on GitHub's machines also runs on the node.
