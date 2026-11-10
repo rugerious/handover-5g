@@ -1,0 +1,29 @@
+# 5G core: Gradiant's Open5GS chart (version pinned) + our values from this repo.
+# releaseName keeps the resource names the Helm install used (open5gs-amf, ...).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: core
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: registry-1.docker.io/gradiantcharts
+      chart: open5gs
+      targetRevision: 2.3.11          # versions.yaml: core.open5gs_k3s.chart_version
+      helm:
+        releaseName: open5gs
+        valueFiles:
+          - $values/deploy/core/open5gs-values.yaml
+    - repoURL: https://github.com/rugerious/handover-5g.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: core
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
