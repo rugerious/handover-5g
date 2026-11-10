@@ -1,0 +1,14 @@
+# Where Argo CD finds the Open5GS chart: Gradiant's public OCI registry.
+# No credentials (public charts), so this Secret holds nothing sensitive.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-gradiant-charts
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  name: gradiant-charts
+  type: helm
+  url: registry-1.docker.io/gradiantcharts
+  enableOCI: "true"
