@@ -177,6 +177,24 @@ data "aws_iam_policy_document" "apply_iam" {
     ]
   }
 
+  # Manage only the k3s cluster's OIDC provider (infra/eso.tf), never the
+  # GitHub one that this pipeline itself depends on.
+  statement {
+    sid = "ManageK3sOidcProvider"
+    actions = [
+      "iam:CreateOpenIDConnectProvider",
+      "iam:DeleteOpenIDConnectProvider",
+      "iam:TagOpenIDConnectProvider",
+      "iam:UntagOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:AddClientIDToOpenIDConnectProvider",
+      "iam:RemoveClientIDFromOpenIDConnectProvider",
+    ]
+    resources = [
+      "arn:aws:iam::${local.account_id}:oidc-provider/${aws_cloudfront_distribution.k3s_oidc.domain_name}",
+    ]
+  }
+
   # The pipeline must never be able to widen its own permissions.
   # Reading these roles stays allowed (refresh needs it); changing them is
   # bootstrap-only, from CloudShell.
