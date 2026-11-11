@@ -23,9 +23,13 @@ spec:
           args:
             - |
               set -eu
-              open5gs-dbctl remove "$IMSI" > /dev/null
+              # deleteMany, not dbctl remove: remove deletes ONE document, and the old
+              # chart populate had added a copy on every start (7 found, bug 14).
+              mongosh "$DB_URI" --quiet --eval "db.subscribers.deleteMany({imsi: '$IMSI'})" > /dev/null
               open5gs-dbctl add_ue_with_apn "$IMSI" "$K" "$OPC" internet > /dev/null
-              echo "subscriber $IMSI loaded (keys from AWS SSM, not printed)"
+              N=$(mongosh "$DB_URI" --quiet --eval "db.subscribers.countDocuments({imsi: '$IMSI'})")
+              [ "$N" = 1 ] || { echo "expected 1 subscriber $IMSI, found $N"; exit 1; }
+              echo "subscriber $IMSI loaded once (keys from AWS SSM, not printed)"
           env:
             - name: DB_URI
               value: mongodb://open5gs-mongodb/open5gs
