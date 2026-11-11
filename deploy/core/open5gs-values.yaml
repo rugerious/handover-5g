@@ -60,6 +60,8 @@ upf:
   containerSecurityContext:
     enabled: true
     runAsNonRoot: false
+    runAsUser: 0                  # added capabilities only take effect for root; the image's
+                                  # user (999) would get NET_ADMIN in the bounding set only
     privileged: false
     allowPrivilegeEscalation: false
     capabilities:
