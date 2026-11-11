@@ -22,6 +22,8 @@ ue:
     repository: ghcr.io/rugerious/handover-5g/srsue
     tag: release_25_10-sha-4b412c0
   startDelaySeconds: 15      # gNB first, then the UE (Compose waited 12 s)
+  # SIM keys k and opc in AWS SSM Parameter Store (step 3.3c), never in Git
+  usimParameterPath: /handover/subscriber/001010123456780
   # Least privilege (2.2d): create tun_srsue and its routes, real-time threads.
   # The only device it gets is /dev/net/tun (see templates/deployment.yaml).
   securityContext:
