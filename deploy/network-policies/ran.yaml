@@ -1,0 +1,51 @@
+# RAN (namespace ran): the gNB + UE pod may only talk to the AMF (N2), the UPF
+# (N3) and DNS. gNB <-> UE is ZeroMQ over 127.0.0.1, inside the pod.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: ran
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gnb-to-core
+  namespace: ran
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: ran }
+  policyTypes: [Egress, Ingress]
+  egress:
+    - to:                                   # DNS (CoreDNS)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:                                   # N2: AMF, NGAP over SCTP
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: core }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: amf }
+      ports:
+        - { protocol: SCTP, port: 38412 }
+    - to:                                   # N3: UPF, GTP-U
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: core }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: upf }
+      ports:
+        - { protocol: UDP, port: 2152 }
+  ingress:
+    - from:                                 # N3 downlink from the UPF
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: core }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: upf }
+      ports:
+        - { protocol: UDP, port: 2152 }

@@ -1,0 +1,132 @@
+# 5G core (namespace core): nothing in or out unless a rule below allows it.
+# Ingress rules are precise (who may reach which port); egress is limited to
+# the core itself, DNS and, for the UPF, the gNB.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: core
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-and-core-egress
+  namespace: core
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:                                   # DNS (CoreDNS)
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:                                   # anything inside the core (ingress rules decide)
+        - podSelector: {}
+---
+# SBI: the network functions call each other over HTTP/2 on 7777
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sbi-within-core
+  namespace: core
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - { protocol: TCP, port: 7777 }
+---
+# MongoDB: only the functions that keep subscriber data, and the subscriber job
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongodb-from-udr-pcf-job
+  namespace: core
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: mongodb }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: udr }
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: pcf }
+        - podSelector:
+            matchLabels: { batch.kubernetes.io/job-name: subscriber-sync }
+      ports:
+        - { protocol: TCP, port: 27017 }
+---
+# N4 (PFCP): the SMF controls the UPF, and the UPF answers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pfcp-smf-upf
+  namespace: core
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app.kubernetes.io/name, operator: In, values: [smf, upf] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/name, operator: In, values: [smf, upf] }
+      ports:
+        - { protocol: UDP, port: 8805 }
+---
+# N2 (NGAP over SCTP): only the gNB, from namespace ran, reaches the AMF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-n2-gnb-to-amf
+  namespace: core
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: amf }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ran }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: ran }
+      ports:
+        - { protocol: SCTP, port: 38412 }
+---
+# N3 (GTP-U): user data between the gNB and the UPF, both directions
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-n3-gnb-upf
+  namespace: core
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: upf }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ran }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: ran }
+      ports:
+        - { protocol: UDP, port: 2152 }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ran }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: ran }
+      ports:
+        - { protocol: UDP, port: 2152 }
