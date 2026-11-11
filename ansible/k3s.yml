@@ -10,6 +10,10 @@
     # Pinned. Matches kubectl 1.35.9 on the laptop. Upgrade = change this line.
     k3s_version: "v1.35.9+k3s1"
 
+    # Public OIDC issuer for service-account tokens (step 3.3a), so AWS IAM can
+    # trust them. Terraform output k3s_oidc_issuer (infra/oidc.tf). Not secret.
+    k3s_oidc_issuer: "https://d6mge3h21cw7s.cloudfront.net"
+
   tasks:
     - name: Refuse to run with a placeholder or unexpected k3s version
       ansible.builtin.assert:
@@ -63,6 +67,12 @@
           disable:
             - traefik                     # no ingress: access is via SSM port-forward
             - servicelb                   # no LoadBalancer services needed
+          kube-apiserver-arg:
+            # New tokens are signed with the public issuer (the first one).
+            - service-account-issuer={{ k3s_oidc_issuer }}
+            # Tokens from the old issuer stay valid, so running pods keep working.
+            - service-account-issuer=https://kubernetes.default.svc.cluster.local
+            - service-account-jwks-uri={{ k3s_oidc_issuer }}/openid/v1/jwks
       register: k3s_config
 
     # -----------------------------------------------------------------------
