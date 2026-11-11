@@ -18,6 +18,10 @@ spec:
     - repoURL: https://github.com/rugerious/handover-5g.git
       targetRevision: main
       ref: values
+    # The subscriber, with keys from AWS SSM (step 3.3e)
+    - repoURL: https://github.com/rugerious/handover-5g.git
+      targetRevision: main
+      path: deploy/core-subscribers
   destination:
     server: https://kubernetes.default.svc
     namespace: core

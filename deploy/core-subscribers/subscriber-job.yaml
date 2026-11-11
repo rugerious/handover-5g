@@ -1,0 +1,47 @@
+# Loads the test subscriber into the core's database with the keys from AWS.
+# Runs after every sync of the core app (Argo CD PostSync hook): removes the
+# subscriber and adds it again, so a key change in SSM is picked up on the next
+# sync. Same image and database as the chart's own populate, which is off.
+# Nothing here prints a key.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: subscriber-sync
+  namespace: core
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6               # MongoDB or the Secret may not be ready yet
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: dbctl
+          image: docker.io/gradiant/open5gs-dbctl:0.10.3   # as the chart's populate
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eu
+              open5gs-dbctl remove "$IMSI" > /dev/null
+              open5gs-dbctl add_ue_with_apn "$IMSI" "$K" "$OPC" internet > /dev/null
+              echo "subscriber $IMSI loaded (keys from AWS SSM, not printed)"
+          env:
+            - name: DB_URI
+              value: mongodb://open5gs-mongodb/open5gs
+            - name: IMSI
+              value: "001010123456780"
+            - name: K
+              valueFrom:
+                secretKeyRef:
+                  name: subscriber-001010123456780
+                  key: k
+            - name: OPC
+              valueFrom:
+                secretKeyRef:
+                  name: subscriber-001010123456780
+                  key: opc
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]

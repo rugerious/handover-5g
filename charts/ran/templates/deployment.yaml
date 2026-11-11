@@ -47,8 +47,23 @@ spec:
         - name: srsue
           image: "{{ .Values.ue.image.repository }}:{{ .Values.ue.image.tag }}"
           command: ["/bin/sh", "-c"]
+          # Fill the SIM keys into a copy of the config that lives only in memory.
           args:
-            - sleep {{ .Values.ue.startDelaySeconds }} && exec srsue /config/ue.conf
+            - >-
+              sed -e "s/__UE_K__/${UE_K}/" -e "s/__UE_OPC__/${UE_OPC}/"
+              /config/ue.conf > /run/usim/ue.conf &&
+              sleep {{ .Values.ue.startDelaySeconds }} && exec srsue /run/usim/ue.conf
+          env:
+            - name: UE_K
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-usim
+                  key: k
+            - name: UE_OPC
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-usim
+                  key: opc
           securityContext:
             {{- toYaml .Values.ue.securityContext | nindent 12 }}
           volumeMounts:
@@ -57,6 +72,8 @@ spec:
               readOnly: true
             - name: ue-tmp
               mountPath: /tmp
+            - name: usim             # config with the keys: memory only, never on disk
+              mountPath: /run/usim
             - name: dev-tun          # the one device the UE needs, instead of privileged
               mountPath: /dev/net/tun
       volumes:
@@ -67,6 +84,10 @@ spec:
           emptyDir: {}
         - name: ue-tmp
           emptyDir: {}
+        - name: usim
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
         - name: dev-tun
           hostPath:
             path: /dev/net/tun

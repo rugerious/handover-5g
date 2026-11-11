@@ -21,10 +21,8 @@ mongodb:
     size: 1Gi                   # k3s local-path disk; survives a node stop/start
 
 populate:
-  enabled: true
-  initCommands:
-    # Public srsRAN/OCUDU test subscriber (same as lab/compose/ue-zmq.conf)
-    - open5gs-dbctl add_ue_with_apn 001010123456780 00112233445566778899aabbccddeeff 63BFA50EE6523365FF14C1F45F88737D internet
+  enabled: false                # its command line would need the keys in Git; the
+                                # subscriber is loaded by deploy/core-subscribers/ instead
 
 amf:
   config:
