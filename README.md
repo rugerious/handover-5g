@@ -15,7 +15,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
 | 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | ✅ 10 Nov 2026 (~12 h) |
-| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | 🚧 3.3a cluster identity trusted by AWS (OIDC) |
+| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | 🚧 3.3b AWS role only External Secrets can use |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
 | 5 | Multi-UE, a second cell and a radio degradation injector; automated acceptance with public reports | 12–16 | ⏳ |
@@ -67,7 +67,8 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 **GitOps (Phase 3)**
 - **Argo CD on k3s** (chart 10.11.6, v3.5.6, pinned in `versions.yaml`): no SSO, no notifications, no ingress. Its web page is reached like the Kubernetes API, through the SSM tunnel with `kubectl port-forward`; nothing is exposed to the internet. The admin password goes straight to the clipboard, never on screen.
 - **Git decides what runs:** an app of apps (`deploy/argocd/`) hands the 5G core (community chart + our values) and the RAN (our chart) to Argo CD. A merge to `main` is a deploy; a manual change in the cluster is put back to what Git says (self-heal). Argo CD adopted the running workloads without restarting them, and the UE kept pinging. `root.yaml` is the only manifest ever applied by hand.
-- **A cluster identity AWS can verify (first step to secrets from AWS):** k3s signs its service-account tokens with a public issuer, `https://<id>.cloudfront.net`. The two documents AWS needs to check those tokens (the OIDC discovery and the cluster's public key) are served by CloudFront from a private S3 bucket that only CloudFront can read; the bucket itself answers 403. The old in-cluster issuer is still accepted, so running pods kept working through the change (apps Synced/Healthy, no failing pods). Next: an AWS role that only the External Secrets service account can use, to read the lab's secrets from Parameter Store instead of Git.
+- **A cluster identity AWS can verify (first step to secrets from AWS):** k3s signs its service-account tokens with a public issuer, `https://<id>.cloudfront.net`. The two documents AWS needs to check those tokens (the OIDC discovery and the cluster's public key) are served by CloudFront from a private S3 bucket that only CloudFront can read; the bucket itself answers 403. The old in-cluster issuer is still accepted, so running pods kept working through the change (apps Synced/Healthy, no failing pods).
+- **An AWS role for one Kubernetes identity:** AWS IAM now trusts the cluster's tokens (an OIDC provider for the issuer above). The role `handover-eso` can be used only by the service account `external-secrets/handover-ssm-reader`, with tokens made for AWS STS; any other pod is refused. It can only read the lab's parameters (`/handover/*`) in SSM Parameter Store, decrypting them only through SSM, for 1 hour at a time. No access keys exist anywhere. The CI pipeline was allowed to manage this one provider and nothing else: it still cannot touch the GitHub provider it depends on.
 
 ## Planned architecture
 
@@ -82,7 +83,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 
 | Path | What |
 |---|---|
-| `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute, Ansible transfer bucket, k3s OIDC discovery (`oidc.tf`, CloudFront + private S3) |
+| `infra/` | Terraform: state backend, OIDC roles (`ci.tf`, bootstrap), network, compute, Ansible transfer bucket, k3s OIDC discovery (`oidc.tf`, CloudFront + private S3), External Secrets role (`eso.tf`) |
 | `ansible/` | Inventory over SSM, the k3s playbook and the kubeconfig playbook |
 | `docs/` | Runbook: daily routine, costs, rebuild |
 | `lab/compose/` | Phase 2 first test: Open5GS + OCUDU gNB + srsUE over ZeroMQ in Docker Compose |
