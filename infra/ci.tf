@@ -72,12 +72,16 @@ data "aws_iam_policy_document" "plan_extra" {
   }
 
   # ReadOnlyAccess can read every S3 object in the account (CloudOps state,
-  # incident photos...). A pull-request job only needs the Handover state.
+  # incident photos...). A pull-request job only needs the Handover state,
+  # plus the k3s OIDC documents (public anyway, via CloudFront) to refresh them.
   statement {
-    sid           = "DenyReadingOtherObjects"
-    effect        = "Deny"
-    actions       = ["s3:GetObject", "s3:GetObjectVersion"]
-    not_resources = ["arn:aws:s3:::${local.state_bucket}/*"]
+    sid     = "DenyReadingOtherObjects"
+    effect  = "Deny"
+    actions = ["s3:GetObject", "s3:GetObjectVersion"]
+    not_resources = [
+      "arn:aws:s3:::${local.state_bucket}/*",
+      "arn:aws:s3:::handover-k3s-oidc-*/*",
+    ]
   }
 }
 
