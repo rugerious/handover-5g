@@ -15,7 +15,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | 0 | Foundations: repo, local Kubernetes (k3d), a fake gNB KPI exporter in a hardened container, CI publishing it to GHCR | 4–6 | ✅ 27 Oct 2026 |
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
 | 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | ✅ 10 Nov 2026 (~12 h) |
-| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | 🚧 3.3d External Secrets reads AWS Parameter Store |
+| 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | 🚧 3.3 secrets from AWS done: the SIM keys are not in Git |
 | 4 | Observability: RAN KPI dashboards and alerts | 8–10 | ⏳ |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
 | 5 | Multi-UE, a second cell and a radio degradation injector; automated acceptance with public reports | 12–16 | ⏳ |
@@ -71,6 +71,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 - **An AWS role for one Kubernetes identity:** AWS IAM now trusts the cluster's tokens (an OIDC provider for the issuer above). The role `handover-eso` can be used only by the service account `external-secrets/handover-ssm-reader`, with tokens made for AWS STS; any other pod is refused. It can only read the lab's parameters (`/handover/*`) in SSM Parameter Store, decrypting them only through SSM, for 1 hour at a time. No access keys exist anywhere. The CI pipeline was allowed to manage this one provider and nothing else: it still cannot touch the GitHub provider it depends on.
 - **SIM keys that nobody has seen:** new random K and OPc for the test SIM were generated straight into SSM Parameter Store as encrypted SecureStrings (`/handover/subscriber/<IMSI>/k`, `/opc`), never shown on screen or written to a file. The old values are the public srsRAN test keys, already in Git history, so moving them would have protected nothing.
 - **External Secrets, deployed by Argo CD:** the operator (chart 2.13.0, pinned in `versions.yaml`) and one `ClusterSecretStore`, `aws-ssm`, which signs in to AWS with a token for `handover-ssm-reader` and the `handover-eso` role. It is usable only from the `core` and `ran` namespaces: a test from another namespace was refused, and a test from `core` received the key (format checked, value never printed). The service account is the only piece created outside Git, because its role annotation contains the account ID (see the runbook). Two fixes on the way: a folder renamed because `.gitignore` rightly blocks anything called `secrets/`, and a duplicate token audience that AWS refused (`Token audience contains more than one audience`).
+- **The network runs on keys from AWS, none in Git:** the core loads the test subscriber with a small Job (`deploy/core-subscribers/`) that reads K and OPc from a Secret made by External Secrets; the UE (RAN chart 0.3.0) fills them into a config file that exists only in memory. Git holds only the parameter paths. **The UE attached and pinged with the new keys** (0% loss, 11 Nov 2026). On the way, the key change exposed an old hidden bug: the chart's populate had added the same subscriber on every start (7 copies), and the core read an old one, so the first attach failed with `MAC failure`. Found by comparing short fingerprints of the key in each place (database, both Secrets, the UE's file) without ever printing it; the Job now removes every copy and fails unless exactly one is left.
 
 ## Planned architecture
 
@@ -89,7 +90,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 | `ansible/` | Inventory over SSM, the k3s playbook and the kubeconfig playbook |
 | `docs/` | Runbook: daily routine, costs, rebuild |
 | `lab/compose/` | Phase 2 first test: Open5GS + OCUDU gNB + srsUE over ZeroMQ in Docker Compose |
-| `deploy/` | Kubernetes deployments: Helm values for the 5G core (`core/`) and Argo CD (`argocd/`), the AWS secret store (`secret-store/`) |
+| `deploy/` | Kubernetes deployments: Helm values for the 5G core (`core/`) and Argo CD (`argocd/`), the AWS secret store (`secret-store/`), the subscriber loader (`core-subscribers/`) |
 | `charts/ran/` | Our Helm chart: OCUDU gNB + srsUE in one pod over ZeroMQ |
 | `versions.yaml` | Every version the lab runs (OCUDU, srsUE, Open5GS, k3s, tools), pinned to exact commits |
 | `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
