@@ -50,3 +50,26 @@ smf:
   config:
     pcrf:
       enabled: false            # 4G policy function, not deployed
+
+upf:
+  # Least privilege (3.5): the UPF process attaches to ogstun, nothing more.
+  # Not privileged; only NET_ADMIN and the one device /dev/net/tun (as the UE).
+  # The chart's init container tun-create stays privileged: it is hard-coded in
+  # the template, and its sysctl (ip_forward) needs a writable /proc/sys. It runs
+  # once at start and exits (see README).
+  containerSecurityContext:
+    enabled: true
+    runAsNonRoot: false
+    privileged: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+      add: [NET_ADMIN]
+  extraVolumes:
+    - name: dev-tun
+      hostPath:
+        path: /dev/net/tun
+        type: CharDevice
+  extraVolumeMounts:
+    - name: dev-tun
+      mountPath: /dev/net/tun
