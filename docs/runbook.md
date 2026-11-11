@@ -56,5 +56,16 @@ ansible-galaxy collection install -r requirements.yml
 ansible-playbook k3s.yml          # SCTP + k3s, safe to run again
 ansible-playbook kubeconfig.yml   # kubeconfig on the laptop
 ```
+
+**External Secrets service account** (once per cluster, after Argo CD has installed External Secrets).
+Its annotation holds the role ARN, which contains the account ID, so it is kept out of Git.
+The ARN goes from Terraform straight into the cluster without being printed:
+```bash
+ROLE_ARN=$(terraform -chdir=infra output -raw eso_role_arn) && \
+kubectl -n external-secrets create serviceaccount handover-ssm-reader --dry-run=client -o yaml | kubectl apply -f - && \
+kubectl -n external-secrets annotate serviceaccount handover-ssm-reader eks.amazonaws.com/role-arn="$ROLE_ARN" --overwrite && \
+unset ROLE_ARN
+kubectl get clustersecretstore aws-ssm    # expect: Valid  ReadWrite  True
+```
 Ansible needs `ansible-core` with `boto3` and `botocore[crt]` in the same environment
 (`pipx install ansible-core && pipx inject ansible-core boto3 "botocore[crt]"`) and the AWS Session Manager plugin.
