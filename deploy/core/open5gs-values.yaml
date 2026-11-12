@@ -50,3 +50,11 @@ smf:
   config:
     pcrf:
       enabled: false            # 4G policy function, not deployed
+
+# PFCP: the UPF advertises its Service, so the SMF reaches it through one address only.
+# Without this the SMF used the Service for association and the pod IP afterwards: conntrack clash, source port remapped, UPF "Cannot find PFCP-Node".
+upf:
+  config:
+    upf:
+      pfcp:
+        advertise: "open5gs-upf-pfcp.core.svc.cluster.local"
