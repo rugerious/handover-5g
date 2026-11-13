@@ -1,0 +1,83 @@
+{{- if .Values.watchdog.enabled }}
+# RAN watchdog (bug 17). Its identity can do exactly one thing: get and patch
+# this chart's own Deployment (a rollout restart). Its token is mounted into the
+# watchdog container only (see deployment.yaml), never into the gNB or the UE.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-watchdog
+  labels:
+    app.kubernetes.io/name: ran
+    app.kubernetes.io/instance: {{ .Release.Name }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-watchdog
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["{{ .Release.Name }}"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-watchdog
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-watchdog
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-watchdog
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-watchdog
+  labels:
+    app.kubernetes.io/name: ran
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  watchdog.sh: |
+    #!/bin/sh
+    # srsUE has a PDU session exactly when tun_srsue exists in the pod's network
+    # (shared by all containers). No session for MISSING checks in a row ->
+    # restart the Deployment; with strategy Recreate the old pod stops before
+    # the new gNB + UE start, as a manual `kubectl rollout restart` does.
+    SA=/var/run/secrets/kubernetes.io/serviceaccount
+    API=https://kubernetes.default.svc
+    log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watchdog: $*"; }
+    nap() { sleep "$1" & wait $!; }          # so SIGTERM is handled at once
+    trap 'log "stopping"; exit 0' TERM INT
+    log "start: grace ${GRACE}s, check every ${PERIOD}s, restart after ${MISSING} misses (pod ${POD_NAME})"
+    nap "$GRACE"
+    missing=0; state=unknown
+    while true; do
+      if grep -q 'tun_srsue:' /proc/net/dev; then
+        [ "$state" = up ] || log "PDU session up (tun_srsue present)"
+        state=up; missing=0
+      else
+        [ "$state" = down ] || log "no PDU session (tun_srsue missing)"
+        state=down; missing=$((missing + 1))
+        if [ "$missing" -ge "$MISSING" ]; then
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          log "no PDU session for $((missing * PERIOD))s: restarting deployment ${DEPLOYMENT}"
+          if curl -sS --fail -o /dev/null --max-time 10 -X PATCH \
+               --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat "$SA/token")" \
+               -H "Content-Type: application/strategic-merge-patch+json" \
+               -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$now\"}}}}}" \
+               "$API/apis/apps/v1/namespaces/${POD_NAMESPACE}/deployments/${DEPLOYMENT}"; then
+            log "restart accepted; this pod will be replaced"
+            nap 600
+          else
+            log "restart FAILED (error above); trying again at the next check"
+          fi
+        fi
+      fi
+      nap "$PERIOD"
+    done
+{{- end }}
