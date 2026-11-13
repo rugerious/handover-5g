@@ -18,6 +18,7 @@ check() {   # check <yes|no> <can-i arguments...>
 kubectl auth whoami 2>/dev/null | sed -n '2,3p'
 echo "--- read"
 check yes list pods -A
+check yes list nodes
 check yes get pods --subresource=log -n core
 check yes list applications.argoproj.io -n argocd
 check yes get clustersecretstores.external-secrets.io
