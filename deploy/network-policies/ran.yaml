@@ -49,3 +49,22 @@ spec:
             matchLabels: { app.kubernetes.io/name: upf }
       ports:
         - { protocol: UDP, port: 2152 }
+---
+# Bug 17 watchdog: the RAN pod may reach the Kubernetes API (k3s on the node,
+# port 6443, in the lab subnet). Only the watchdog container holds a token, and
+# that token can only restart this one Deployment (charts/ran/templates/watchdog.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ran-to-apiserver
+  namespace: ran
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: ran }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.50.1.0/24          # lab subnet (infra/network.tf); the node is the only host
+      ports:
+        - { protocol: TCP, port: 6443 }

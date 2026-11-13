@@ -32,3 +32,16 @@ ue:
     capabilities:
       drop: [ALL]
       add: [NET_ADMIN, SYS_NICE, NET_RAW]   # NET_RAW: ping, the test traffic of our "test phone"
+
+# Bug 17 (boot race): srsUE never retries after a reject, and the gNB <-> UE
+# ZeroMQ link only recovers as a fresh pod (restarting one container leaves the
+# other stuck, tested 13 Nov 2026). The watchdog restarts the RAN Deployment,
+# like `kubectl rollout restart`, when the UE has had no PDU session for a while.
+watchdog:
+  enabled: true
+  image:
+    repository: curlimages/curl
+    tag: "8.23.0"            # pushed 28 Oct 2026, newest at least 14 days old on 13 Nov
+  graceSeconds: 60           # after the pod starts: gNB up + UE 15 s delay + attach
+  periodSeconds: 15
+  missingChecks: 6           # 6 checks in a row without tun_srsue (75-90 s) -> restart the RAN

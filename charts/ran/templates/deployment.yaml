@@ -21,7 +21,16 @@ spec:
       annotations:
         # restart the pod when the configuration changes
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/watchdog: {{ include (print $.Template.BasePath "/watchdog.yaml") . | sha256sum }}
     spec:
+      # No API token in the gNB or UE containers; the watchdog mounts its own.
+      automountServiceAccountToken: false
+      {{- if .Values.watchdog.enabled }}
+      serviceAccountName: {{ .Release.Name }}-watchdog
+      {{- end }}
+      # srsUE can hang while stopping when its ZeroMQ peer is gone (13 Nov):
+      # don't wait the default 30 s before the hard stop.
+      terminationGracePeriodSeconds: 10
       containers:
         - name: gnb
           image: "{{ .Values.gnb.image.repository }}:{{ .Values.gnb.image.tag }}"
@@ -64,6 +73,12 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-usim
                   key: opc
+          # Ready only with a PDU session (tun_srsue), not just "processes started".
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "grep -q 'tun_srsue:' /proc/net/dev"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
           securityContext:
             {{- toYaml .Values.ue.securityContext | nindent 12 }}
           volumeMounts:
@@ -76,6 +91,48 @@ spec:
               mountPath: /run/usim
             - name: dev-tun          # the one device the UE needs, instead of privileged
               mountPath: /dev/net/tun
+        {{- if .Values.watchdog.enabled }}
+        - name: watchdog
+          image: "{{ .Values.watchdog.image.repository }}:{{ .Values.watchdog.image.tag }}"
+          command: ["/bin/sh", "/watchdog/watchdog.sh"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DEPLOYMENT
+              value: {{ .Release.Name }}
+            - name: GRACE
+              value: "{{ .Values.watchdog.graceSeconds }}"
+            - name: PERIOD
+              value: "{{ .Values.watchdog.periodSeconds }}"
+            - name: MISSING
+              value: "{{ .Values.watchdog.missingChecks }}"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 32Mi }
+          volumeMounts:
+            - name: watchdog-script
+              mountPath: /watchdog
+              readOnly: true
+            - name: watchdog-token     # this container only
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+        {{- end }}
       volumes:
         - name: config
           configMap:
@@ -92,3 +149,20 @@ spec:
           hostPath:
             path: /dev/net/tun
             type: CharDevice
+        {{- if .Values.watchdog.enabled }}
+        - name: watchdog-script
+          configMap:
+            name: {{ .Release.Name }}-watchdog
+            defaultMode: 0555
+        - name: watchdog-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+        {{- end }}

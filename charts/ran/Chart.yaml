@@ -2,5 +2,5 @@ apiVersion: v2
 name: ran
 description: Handover lab RAN - OCUDU gNB and srsUE in one pod, linked by a ZeroMQ simulated radio
 type: application
-version: 0.3.0
+version: 0.4.0
 appVersion: "release_26_10"
