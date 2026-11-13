@@ -22,6 +22,12 @@ ue:
     repository: ghcr.io/rugerious/handover-5g/srsue
     tag: release_25_10-sha-4b412c0
   startDelaySeconds: 15      # gNB first, then the UE (Compose waited 12 s)
+  # Bug 21: "Ready" = the UE can pass traffic, not just "it has a tunnel". After the
+  # SMF and UPF restarted together (13 Nov) the UE kept tun_srsue but the session
+  # behind it was gone (ping 100% loss) and nothing noticed. The readiness probe
+  # pings the core's side of the session (the UPF's ogstun gateway) through the tunnel.
+  dataPathCheck:
+    address: 10.45.0.1
   # SIM keys k and opc in AWS SSM Parameter Store (step 3.3c), never in Git
   usimParameterPath: /handover/subscriber/001010123456780
   # Least privilege (2.2d): create tun_srsue and its routes, real-time threads.
@@ -36,7 +42,8 @@ ue:
 # Bug 17 (boot race): srsUE never retries after a reject, and the gNB <-> UE
 # ZeroMQ link only recovers as a fresh pod (restarting one container leaves the
 # other stuck, tested 13 Nov 2026). The watchdog restarts the RAN Deployment,
-# like `kubectl rollout restart`, when the UE has had no PDU session for a while.
+# like `kubectl rollout restart`, when the RAN has not been Ready for a while
+# (Ready = the UE can ping the core through its tunnel, bug 21).
 watchdog:
   enabled: true
   image:
@@ -44,4 +51,4 @@ watchdog:
     tag: "8.23.0"            # pushed 28 Oct 2026, newest at least 14 days old on 13 Nov
   graceSeconds: 60           # after the pod starts: gNB up + UE 15 s delay + attach
   periodSeconds: 15
-  missingChecks: 6           # 6 checks in a row without tun_srsue (75-90 s) -> restart the RAN
+  missingChecks: 6           # 6 checks in a row not Ready (75-90 s) -> restart the RAN

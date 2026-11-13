@@ -73,12 +73,16 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-usim
                   key: opc
-          # Ready only with a PDU session (tun_srsue), not just "processes started".
+          # Ready only when the UE can pass traffic: one ping to the core through
+          # tun_srsue (fails too when the tunnel is missing). Bug 21: a tunnel alone
+          # can outlive its session.
           readinessProbe:
             exec:
-              command: ["/bin/sh", "-c", "grep -q 'tun_srsue:' /proc/net/dev"]
+              command: ["/bin/sh", "-c", "ping -c 1 -W 2 -I tun_srsue {{ .Values.ue.dataPathCheck.address }} >/dev/null"]
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           securityContext:
             {{- toYaml .Values.ue.securityContext | nindent 12 }}
           volumeMounts:

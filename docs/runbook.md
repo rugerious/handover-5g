@@ -202,7 +202,7 @@ kubectl -n ran exec deploy/ran -c srsue -- ping -c 5 10.45.0.1               # e
 No `tun_srsue` means the UE never got a session, and the ping then fails with 100% loss.
 After a node start this is usually the boot race: the RAN is ready before the core's
 database-backed functions and srsUE does not try again. The RAN watchdog (chart 0.4.0) fixes it
-by itself: after 6 checks without a session it restarts the RAN, usually within 3 minutes of
+by itself: after 6 checks not Ready (no tunnel, or no traffic through it) it restarts the RAN, usually within 3 minutes of
 boot. See what it did with `kubectl -n ran logs deploy/ran -c watchdog`. Only if there is still
 no session after 5 minutes, restart the RAN by hand, give the UE 30 s, and check again:
 ```bash

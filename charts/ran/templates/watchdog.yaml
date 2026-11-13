@@ -1,5 +1,5 @@
 {{- if .Values.watchdog.enabled }}
-# RAN watchdog (bug 17). Its identity can do exactly one thing: get and patch
+# RAN watchdog (bugs 17, 21). Its identity can do exactly one thing: get and patch
 # this chart's own Deployment (a rollout restart). Its token is mounted into the
 # watchdog container only (see deployment.yaml), never into the gNB or the UE.
 apiVersion: v1
@@ -44,33 +44,36 @@ metadata:
 data:
   watchdog.sh: |
     #!/bin/sh
-    # srsUE has a PDU session exactly when tun_srsue exists in the pod's network
-    # (shared by all containers). No session for MISSING checks in a row ->
-    # restart the Deployment; with strategy Recreate the old pod stops before
-    # the new gNB + UE start, as a manual `kubectl rollout restart` does.
+    # The RAN is healthy when its Deployment has a Ready replica, and srsUE is
+    # Ready only when it can ping the core through its tunnel (bug 21; before,
+    # this checked only that tun_srsue existed, which a dead session can keep).
+    # Not Ready for MISSING checks in a row -> restart the Deployment; with
+    # strategy Recreate the old pod stops before the new gNB + UE start, as a
+    # manual `kubectl rollout restart` does.
     SA=/var/run/secrets/kubernetes.io/serviceaccount
     API=https://kubernetes.default.svc
+    URL="$API/apis/apps/v1/namespaces/${POD_NAMESPACE}/deployments/${DEPLOYMENT}"
     log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watchdog: $*"; }
     nap() { sleep "$1" & wait $!; }          # so SIGTERM is handled at once
+    api() { curl -sS --fail --max-time 10 --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat "$SA/token")" "$@"; }
     trap 'log "stopping"; exit 0' TERM INT
-    log "start: grace ${GRACE}s, check every ${PERIOD}s, restart after ${MISSING} misses (pod ${POD_NAME})"
+    log "start: grace ${GRACE}s, check every ${PERIOD}s, restart after ${MISSING} checks not Ready (pod ${POD_NAME})"
     nap "$GRACE"
     missing=0; state=unknown
     while true; do
-      if grep -q 'tun_srsue:' /proc/net/dev; then
-        [ "$state" = up ] || log "PDU session up (tun_srsue present)"
+      if ! status=$(api "$URL" 2>&1); then
+        log "could not read the RAN status (${status}); not counted"
+      elif echo "$status" | grep -q '"readyReplicas": *[1-9]'; then
+        [ "$state" = up ] || log "data path up (RAN Ready: the UE pings the core)"
         state=up; missing=0
       else
-        [ "$state" = down ] || log "no PDU session (tun_srsue missing)"
+        [ "$state" = down ] || log "data path down (RAN not Ready: no tunnel, or no traffic through it)"
         state=down; missing=$((missing + 1))
         if [ "$missing" -ge "$MISSING" ]; then
           now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          log "no PDU session for ${missing} checks in a row: restarting deployment ${DEPLOYMENT}"
-          if curl -sS --fail -o /dev/null --max-time 10 -X PATCH \
-               --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat "$SA/token")" \
-               -H "Content-Type: application/strategic-merge-patch+json" \
-               -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$now\"}}}}}" \
-               "$API/apis/apps/v1/namespaces/${POD_NAMESPACE}/deployments/${DEPLOYMENT}"; then
+          log "not Ready for ${missing} checks in a row: restarting deployment ${DEPLOYMENT}"
+          if api -o /dev/null -X PATCH -H "Content-Type: application/strategic-merge-patch+json" \
+               -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$now\"}}}}}" "$URL"; then
             log "restart accepted; this pod will be replaced"
             nap 600
           else
