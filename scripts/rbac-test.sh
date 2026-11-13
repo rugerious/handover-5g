@@ -31,6 +31,7 @@ check yes patch deployments.apps -n core
 check yes patch externalsecrets.external-secrets.io -n core
 check yes create pods --subresource=exec -n ran
 check yes create pods --subresource=portforward -n argocd
+check yes create pods --subresource=portforward -n monitoring
 echo "--- kept away"
 check no  create pods --subresource=exec -n core
 check no  create pods --subresource=exec -n argocd

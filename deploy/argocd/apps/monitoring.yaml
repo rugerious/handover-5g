@@ -1,0 +1,39 @@
+# Observability (Phase 4.1): kube-prometheus-stack (version pinned) + our values,
+# plus the Grafana admin secret and the namespace's NetworkPolicy from this repo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 92.16.1           # versions.yaml: observability.kube_prometheus_stack.chart_version
+      helm:
+        releaseName: kps
+        valueFiles:
+          - $values/deploy/monitoring/values.yaml
+    - repoURL: https://github.com/rugerious/handover-5g.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/rugerious/handover-5g.git
+      targetRevision: main
+      path: deploy/monitoring/extras
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true            # the Prometheus CRDs are too large for client-side apply
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

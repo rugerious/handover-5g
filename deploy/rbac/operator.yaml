@@ -9,7 +9,7 @@
 #   restart deployments and force External Secrets to re-read, in core and ran
 #   exec into pods in ran only (the UE ping test); never in core or argocd,
 #     because pods there hold database access or Argo CD's admin token
-#   port-forward in argocd (the web page)
+#   port-forward in argocd and monitoring (the Argo CD and Grafana pages)
 # Not allowed: Secrets, delete, create, scale, anything cluster-wide.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -131,6 +131,20 @@ kind: RoleBinding
 metadata:
   name: operator-portforward-desktop
   namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: handover-operator-portforward
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-portforward-desktop
+  namespace: monitoring
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
