@@ -50,14 +50,58 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
 
 ## Rebuild from scratch
 
+Use this when the node is new or k3s was reinstalled. Every block runs in the **LAPTOP tab**
+(WSL Ubuntu, in `~/handover-5g`, on an up-to-date `main`), with the AWS sign-in, the tunnel and
+`KUBECONFIG` from *Start* above. The order matters: each step needs the one before.
+
+If the node itself was replaced (new instance), its ID changes: update it in this runbook
+(`terraform -chdir=infra output`) before using the *Start* commands.
+
+**1. k3s and the kubeconfig** (Ansible over SSM):
 ```bash
-cd ansible
+cd ~/handover-5g/ansible
 ansible-galaxy collection install -r requirements.yml
 ansible-playbook k3s.yml          # SCTP + k3s, safe to run again
 ansible-playbook kubeconfig.yml   # kubeconfig on the laptop
+# Optional, only for the Docker Compose lab (Phase 2.1): ansible-playbook docker.yml
+cd ~/handover-5g
+```
+Ansible needs `ansible-core` with `boto3` and `botocore[crt]` in the same environment
+(`pipx install ansible-core && pipx inject ansible-core boto3 "botocore[crt]"`) and the AWS Session Manager plugin.
+
+**2. Publish the cluster's new signing key.** A new k3s install makes a new service-account
+signing key. AWS checks the tokens of External Secrets against the copy in `infra/oidc/jwks.json`,
+so an old copy means no secrets, no subscriber and no attach.
+```bash
+kubectl get --raw /openid/v1/jwks > infra/oidc/jwks.json
+git diff --stat infra/oidc/jwks.json   # nothing: same key, skip to step 3
+```
+If the file changed: branch, commit, PR as usual. The CI plan must show exactly one change
+(`aws_s3_object.k3s_oidc_jwks`); merge and approve the apply. CloudFront does not cache these
+files, so AWS sees the new key as soon as the apply finishes.
+
+**3. Argo CD** (Helm, the one install not done by Argo CD itself; version from `versions.yaml`):
+```bash
+helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null; helm repo update argo
+helm upgrade --install argocd argo/argo-cd --version 10.11.6 \
+  -n argocd --create-namespace -f deploy/argocd/values.yaml
+kubectl -n argocd rollout status deploy/argocd-server --timeout=5m
+```
+Admin password: straight to the Windows clipboard, never on screen. Save it in the password
+manager, then delete the secret that holds it:
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d | clip.exe
+# paste into the password manager first, then:
+kubectl -n argocd delete secret argocd-initial-admin-secret
 ```
 
-**External Secrets service account** (once per cluster, after Argo CD has installed External Secrets).
+**4. Hand everything else to Git** (the only manifest ever applied by hand):
+```bash
+kubectl apply -f deploy/argocd/root.yaml
+until kubectl get ns external-secrets >/dev/null 2>&1; do sleep 10; done; echo "External Secrets namespace is there"
+```
+
+**5. External Secrets service account** (once per cluster, after Argo CD has installed External Secrets).
 Its annotation holds the role ARN, which contains the account ID, so it is kept out of Git.
 The ARN goes from Terraform straight into the cluster without being printed:
 ```bash
@@ -67,5 +111,45 @@ kubectl -n external-secrets annotate serviceaccount handover-ssm-reader eks.amaz
 unset ROLE_ARN
 kubectl get clustersecretstore aws-ssm    # expect: Valid  ReadWrite  True
 ```
-Ansible needs `ansible-core` with `boto3` and `botocore[crt]` in the same environment
-(`pipx install ansible-core && pipx inject ansible-core boto3 "botocore[crt]"`) and the AWS Session Manager plugin.
+
+**6. SIM keys in SSM Parameter Store.** They live in AWS, not in the cluster, so a rebuild
+normally finds them already there. This block creates only what is missing (random values,
+never shown) and leaves existing keys alone, because changing them means the old ones in the
+core and the UE no longer match until both re-read them:
+```bash
+for p in k opc; do
+  name=/handover/subscriber/001010123456780/$p
+  if aws ssm get-parameter --name "$name" --query Parameter.Name --output text >/dev/null 2>&1; then
+    echo "$name: exists, kept"
+  else
+    aws ssm put-parameter --name "$name" --type SecureString --value "$(openssl rand -hex 16)" \
+      --tags Key=Project,Value=handover --query Version --output text >/dev/null && echo "$name: created"
+  fi
+  # format check without printing the value: expect 1
+  aws ssm get-parameter --name "$name" --with-decryption --query Parameter.Value --output text | grep -cE '^[0-9a-f]{32}$'
+done
+```
+
+**7. Make External Secrets read now** (instead of waiting up to an hour for its next refresh):
+```bash
+kubectl annotate externalsecret -A --all force-sync=$(date +%s) --overwrite
+kubectl get externalsecret -A    # expect: SecretSynced  True
+```
+
+**8. Check the lab:**
+```bash
+kubectl -n argocd get applications              # expect 6 apps: Synced  Healthy
+kubectl -n ran exec deploy/ran -c srsue -- sh -c 'ip -br addr | grep tun'   # expect tun_srsue 10.45.0.x
+kubectl -n ran exec deploy/ran -c srsue -- ping -c 5 10.45.0.1               # expect 0% packet loss
+```
+No `tun_srsue` means the UE never got a session, and the ping then fails with 100% loss.
+After a node start this is usually the known boot race: the RAN is ready before the core's
+database-backed functions (seen with the UDR up to 67 s later), the UE is turned away once and
+does not try again. Restart the RAN, give the UE 30 s to register, and check again
+(if the first attach after the restart also fails, run it once more):
+```bash
+kubectl -n ran rollout restart deploy/ran && kubectl -n ran rollout status deploy/ran --timeout=3m
+sleep 30
+kubectl -n ran exec deploy/ran -c srsue -- sh -c 'ip -br addr | grep tun'
+kubectl -n ran exec deploy/ran -c srsue -- ping -c 5 10.45.0.1
+```
