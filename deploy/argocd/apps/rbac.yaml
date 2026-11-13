@@ -1,0 +1,24 @@
+# Who may do what from a laptop (Phase 3 gate): deploy/rbac/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rbac
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rugerious/handover-5g.git
+    targetRevision: main
+    path: deploy/rbac
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true          # a binding deleted from Git is deleted from the cluster
+      selfHeal: true
+    retry:                 # on a new cluster, core/ran/argocd may not exist yet
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

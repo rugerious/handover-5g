@@ -27,7 +27,11 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
    export KUBECONFIG=~/.kube/handover.yaml
    kubectl get nodes
    ```
-   No kubeconfig yet, or the node was rebuilt? `cd ansible && ansible-playbook kubeconfig.yml`
+   This is the daily user, `rugerious-desktop`: a personal certificate valid 45 days, with only
+   the permissions in `deploy/rbac/operator.yaml` (read all but Secrets, logs, restarts, RAN exec,
+   Argo CD port-forward). No kubeconfig yet, `x509: certificate has expired`, or the node was rebuilt?
+   `cd ~/handover-5g/ansible && ansible-playbook kubeconfig.yml && cd ..` (it renews the
+   certificate when less than 7 days are left, otherwise it changes nothing).
 5. **Argo CD web page** (optional), through the same tunnel; then open https://localhost:8080 (user `admin`, password in the password manager):
    ```bash
    nohup kubectl -n argocd port-forward svc/argocd-server 8080:443 > /tmp/argocd-pf.log 2>&1 < /dev/null &
@@ -42,6 +46,36 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
    ```
    Safety net: EventBridge Scheduler stops it every night at 23:00 London time anyway.
 
+## Admin access (break glass)
+
+Only for rebuild steps 2 to 5 below or a fix the daily user is not allowed to make.
+The admin key of k3s never leaves the node. Instead, the playbook makes a **1-hour certificate**
+for `rugerious-desktop-admin`, which is admin only because of `deploy/rbac/break-glass.yaml`:
+```bash
+cd ~/handover-5g/ansible && ansible-playbook kubeconfig.yml -e admin=true && cd ..
+export KUBECONFIG=~/.kube/handover-admin.yaml && kubectl auth whoami
+# ... the admin work ...
+export KUBECONFIG=~/.kube/handover.yaml       # back to the daily user
+```
+After an hour the file stops working; run the playbook again if more time is needed.
+The other way in is a shell on the node through SSM: `sudo k3s kubectl ...`.
+
+## New laptop
+
+Everything the lab needs lives in GitHub, AWS and the node; the laptop only holds tools and
+its own certificates. On a new machine: install the tools (versions in `versions.yaml`),
+`aws login`, `gh auth login`, clone the repo, then give the machine its own device name:
+add a copy of the `desktop` bindings in `deploy/rbac/` with the new name (PR, merge), and run
+`ansible-playbook kubeconfig.yml -e device=<name>` (and `-e admin=true -e device=<name>` once
+its break-glass binding exists).
+
+## Lost or stolen laptop
+
+Client certificates cannot be revoked, but they open nothing without a binding. Delete that
+device's bindings in `deploy/rbac/` (both files) and merge: Argo CD removes them within minutes
+and the laptop's certificates stop working, even though they have not expired (45 days daily,
+1 hour admin). Then sign out of AWS and GitHub sessions on that machine from their websites.
+
 ## Costs
 
 - Node running: about $0.40/hour (c7i.2xlarge, 8 vCPU) plus $0.005/hour for its public IP.
@@ -51,8 +85,10 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
 ## Rebuild from scratch
 
 Use this when the node is new or k3s was reinstalled. Every block runs in the **LAPTOP tab**
-(WSL Ubuntu, in `~/handover-5g`, on an up-to-date `main`), with the AWS sign-in, the tunnel and
-`KUBECONFIG` from *Start* above. The order matters: each step needs the one before.
+(WSL Ubuntu, in `~/handover-5g`, on an up-to-date `main`), with the AWS sign-in and the tunnel
+from *Start* above. The order matters: each step needs the one before. Steps 2 to 5 run as
+**admin** (the daily user gets its permissions from Argo CD, which arrives in step 4); steps 6
+to 8 run as the daily user.
 
 If the node itself was replaced (new instance), its ID changes: update it in this runbook
 (`terraform -chdir=infra output`) before using the *Start* commands.
@@ -62,9 +98,11 @@ If the node itself was replaced (new instance), its ID changes: update it in thi
 cd ~/handover-5g/ansible
 ansible-galaxy collection install -r requirements.yml
 ansible-playbook k3s.yml          # SCTP + k3s, safe to run again
-ansible-playbook kubeconfig.yml   # kubeconfig on the laptop
+ansible-playbook kubeconfig.yml                 # daily kubeconfig (no permissions until step 4)
+ansible-playbook kubeconfig.yml -e admin=true   # 1-hour admin kubeconfig + its binding
 # Optional, only for the Docker Compose lab (Phase 2.1): ansible-playbook docker.yml
 cd ~/handover-5g
+export KUBECONFIG=~/.kube/handover-admin.yaml   # admin for steps 2 to 5
 ```
 Ansible needs `ansible-core` with `boto3` and `botocore[crt]` in the same environment
 (`pipx install ansible-core && pipx inject ansible-core boto3 "botocore[crt]"`) and the AWS Session Manager plugin.
@@ -110,6 +148,11 @@ kubectl -n external-secrets create serviceaccount handover-ssm-reader --dry-run=
 kubectl -n external-secrets annotate serviceaccount handover-ssm-reader eks.amazonaws.com/role-arn="$ROLE_ARN" --overwrite && \
 unset ROLE_ARN
 kubectl get clustersecretstore aws-ssm    # expect: Valid  ReadWrite  True
+```
+
+From here on, the daily user is enough (Argo CD has applied `deploy/rbac/`):
+```bash
+export KUBECONFIG=~/.kube/handover.yaml && scripts/rbac-test.sh   # expect: 0 failed
 ```
 
 **6. SIM keys in SSM Parameter Store.** They live in AWS, not in the cluster, so a rebuild
