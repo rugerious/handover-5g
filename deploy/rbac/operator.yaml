@@ -1,0 +1,138 @@
+# Day-to-day access for the lab operator from a laptop (Phase 3 gate).
+# The user comes from a 45-day client certificate made by ansible/kubeconfig.yml
+# (user rugerious-<device>). Client certificates cannot be revoked, so every
+# binding names one device: a lost laptop is cut off by deleting its bindings here.
+#
+# What the daily user can do:
+#   read everything except Secrets (built-in "view", plus Argo CD apps and External Secrets objects)
+#   logs everywhere (part of "view")
+#   restart deployments and force External Secrets to re-read, in core and ran
+#   exec into pods in ran only (the UE ping test); never in core or argocd,
+#     because pods there hold database access or Argo CD's admin token
+#   port-forward in argocd (the web page)
+# Not allowed: Secrets, delete, create, scale, anything cluster-wide.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: handover-operator-read
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "appprojects"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets", "secretstores", "clustersecretstores"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: handover-operator-restart
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["patch"]                    # kubectl rollout restart
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets"]
+    verbs: ["patch"]                    # kubectl annotate ... force-sync
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: handover-operator-exec
+rules:
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]            # get: exec over WebSocket (kubectl 1.30+)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: handover-operator-portforward
+rules:
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["get", "create"]
+# --- Bindings for device "desktop" -------------------------------------------
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: operator-view-desktop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view                            # built in: read all, no Secrets
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: operator-read-desktop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: handover-operator-read
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-restart-desktop
+  namespace: core
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: handover-operator-restart
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-restart-desktop
+  namespace: ran
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: handover-operator-restart
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-exec-desktop
+  namespace: ran
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: handover-operator-exec
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-portforward-desktop
+  namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: handover-operator-portforward
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop

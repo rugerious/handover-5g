@@ -1,0 +1,17 @@
+# Break-glass admin for device "desktop": cluster-admin for the user of the
+# 1-hour certificate from `ansible-playbook kubeconfig.yml -e admin=true`.
+# On a brand-new cluster (before Argo CD exists) that playbook creates this
+# binding once; Argo CD owns it afterwards. Delete it here to remove admin
+# access from that device, even before its certificate expires.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: break-glass-desktop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rugerious-desktop-admin
