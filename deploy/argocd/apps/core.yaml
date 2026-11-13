@@ -31,3 +31,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true  # ServiceMonitors (4.2) need the monitoring app's CRDs first
+    retry:                                # ...so on a fresh cluster, try again until they exist
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

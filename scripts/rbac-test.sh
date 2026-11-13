@@ -22,6 +22,7 @@ check yes list nodes
 check yes get pods --subresource=log -n core
 check yes list applications.argoproj.io -n argocd
 check yes get clustersecretstores.external-secrets.io
+check yes list servicemonitors.monitoring.coreos.com -n core
 check no  get secrets -n core
 check no  get secrets -n ran
 check no  list secrets -A

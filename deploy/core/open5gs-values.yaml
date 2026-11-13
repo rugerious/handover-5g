@@ -40,6 +40,8 @@ amf:
   services:
     ngap:
       clusterIP: 10.43.38.12    # fixed, so the gNB config can point at it (k3s services: 10.43.0.0/16)
+  # Phase 4.2: Prometheus metrics on port 9090 + a ServiceMonitor for kube-prometheus-stack
+  metrics: { enabled: true, serviceMonitor: { enabled: true } }
 
 nrf:
   config:
@@ -50,6 +52,12 @@ smf:
   config:
     pcrf:
       enabled: false            # 4G policy function, not deployed
+  # Phase 4.2: Prometheus metrics on port 9090 + a ServiceMonitor for kube-prometheus-stack
+  metrics: { enabled: true, serviceMonitor: { enabled: true } }
+
+pcf:
+  # Phase 4.2: Prometheus metrics on port 9090 + a ServiceMonitor for kube-prometheus-stack
+  metrics: { enabled: true, serviceMonitor: { enabled: true } }
 
 # PFCP: the UPF advertises its Service, so the SMF reaches it through one address only.
 # Without this the SMF used the Service for association and the pod IP afterwards: conntrack clash, source port remapped, UPF "Cannot find PFCP-Node".
@@ -81,3 +89,5 @@ upf:
     upf:
       pfcp:
         advertise: "open5gs-upf-pfcp.core.svc.cluster.local"
+  # Phase 4.2: Prometheus metrics on port 9090 + a ServiceMonitor for kube-prometheus-stack
+  metrics: { enabled: true, serviceMonitor: { enabled: true } }
