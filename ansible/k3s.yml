@@ -124,3 +124,22 @@
     - name: Show the node
       ansible.builtin.debug:
         var: nodes.stdout_lines
+
+    # -----------------------------------------------------------------------
+    # Operations: troubleshooting tools and the node's copy of the repo.
+    # Both were first set up by hand (12 Nov / 1 Nov); now the playbook owns them.
+    # -----------------------------------------------------------------------
+    - name: Troubleshooting tools (conntrack found bug 15; tcpdump reads kube-router's drop log)
+      ansible.builtin.apt:
+        name:
+          - conntrack
+          - tcpdump
+        state: present
+        update_cache: true
+        cache_valid_time: 86400
+
+    - name: Copy of the repo on the node, kept on main (used by the Compose lab, lab/compose)
+      ansible.builtin.git:
+        repo: https://github.com/rugerious/handover-5g.git
+        dest: /opt/handover/repo
+        version: main

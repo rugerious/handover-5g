@@ -51,7 +51,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 - Ansible reaches the node through SSM. Files travel through a private S3 bucket (HTTPS only, no versioning, everything deleted after 1 day) using short-lived presigned links, so the node itself has no S3 permissions.
 
 **Kubernetes (k3s) on the node**
-- Installed by an **Ansible playbook over SSM**: k3s pinned to `v1.35.9+k3s1`, the SCTP kernel module (5G's N2 transport) loaded and persistent. Running it a second time changes nothing.
+- Installed by an **Ansible playbook over SSM**: k3s pinned to `v1.35.9+k3s1`, the SCTP kernel module (5G's N2 transport) loaded and persistent, the troubleshooting tools `conntrack` and `tcpdump`, and the node's copy of this repo kept on `main`. Nothing on the node is set up by hand. Running it a second time changes nothing.
 - **Secrets encrypted at rest**, admin kubeconfig readable by root only, no ingress or load balancer.
 - The Kubernetes API is **not exposed**: `kubectl` on the laptop goes through an SSM port-forward that exists only while it's open.
 - Daily start/stop, costs and rebuild steps are in the [runbook](docs/runbook.md). The kubeconfig comes from one playbook (`ansible/kubeconfig.yml`); since Phase 3 it no longer carries the admin key (below).
