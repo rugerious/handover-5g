@@ -44,4 +44,4 @@ watchdog:
     tag: "8.23.0"            # pushed 28 Oct 2026, newest at least 14 days old on 13 Nov
   graceSeconds: 60           # after the pod starts: gNB up + UE 15 s delay + attach
   periodSeconds: 15
-  missingChecks: 6           # 6 x 15 s = 90 s without tun_srsue -> restart the RAN
+  missingChecks: 6           # 6 checks in a row without tun_srsue (75-90 s) -> restart the RAN

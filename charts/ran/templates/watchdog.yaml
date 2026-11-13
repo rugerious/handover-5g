@@ -65,7 +65,7 @@ data:
         state=down; missing=$((missing + 1))
         if [ "$missing" -ge "$MISSING" ]; then
           now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          log "no PDU session for $((missing * PERIOD))s: restarting deployment ${DEPLOYMENT}"
+          log "no PDU session for ${missing} checks in a row: restarting deployment ${DEPLOYMENT}"
           if curl -sS --fail -o /dev/null --max-time 10 -X PATCH \
                --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat "$SA/token")" \
                -H "Content-Type: application/strategic-merge-patch+json" \
