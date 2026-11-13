@@ -37,9 +37,16 @@ Everything runs from WSL Ubuntu on the laptop. No SSH, no open ports, no access 
    nohup kubectl -n argocd port-forward svc/argocd-server 8080:443 > /tmp/argocd-pf.log 2>&1 < /dev/null &
    ```
 
+6. **Grafana** (optional), through the same tunnel; then open http://localhost:3000 (user `admin`).
+   The password lives only in AWS SSM; this puts it on the Windows clipboard without showing it:
+   ```bash
+   aws ssm get-parameter --name /handover/grafana/admin-password --with-decryption --query Parameter.Value --output text | tr -d '\n' | clip.exe
+   nohup kubectl -n monitoring port-forward svc/kps-grafana 3000:80 > /tmp/grafana-pf.log 2>&1 < /dev/null &
+   ```
+
 ## End
 
-1. Close the tunnel and the Argo CD port-forward: `pkill -f AWS-StartPortForwardingSession; pkill -f 'port-forward svc/argocd-server'`
+1. Close the tunnel and the port-forwards: `pkill -f AWS-StartPortForwardingSession; pkill -f 'port-forward svc/'`
 2. **Stop the node** (the disk keeps everything):
    ```bash
    aws ec2 stop-instances --instance-ids i-01a352f99cc22979b --output text --query 'StoppingInstances[].CurrentState.Name'
@@ -171,6 +178,13 @@ for p in k opc; do
   # format check without printing the value: expect 1
   aws ssm get-parameter --name "$name" --with-decryption --query Parameter.Value --output text | grep -cE '^[0-9a-f]{32}$'
 done
+```
+Grafana's admin password, the same way (only if missing; 32 random characters, never shown):
+```bash
+name=/handover/grafana/admin-password
+aws ssm get-parameter --name "$name" --query Parameter.Name --output text >/dev/null 2>&1 && echo "$name: exists, kept" || \
+  { aws ssm put-parameter --name "$name" --type SecureString --value "$(openssl rand -base64 24 | tr -d '/+=\n' | cut -c1-32)" \
+      --tags Key=Project,Value=handover --query Version --output text >/dev/null && echo "$name: created"; }
 ```
 
 **7. Make External Secrets read now** (instead of waiting up to an hour for its next refresh):

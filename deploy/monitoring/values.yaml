@@ -1,0 +1,88 @@
+# kube-prometheus-stack for the Handover lab (Phase 4.1). Chart version pinned in
+# versions.yaml (observability.kube_prometheus_stack) and deploy/argocd/apps/monitoring.yaml.
+# Single node, k3s: keep it small, keep the radio's CPU safe, nothing exposed.
+fullnameOverride: kps
+
+# k3s runs the controller-manager, scheduler, proxy and its datastore inside one
+# process and does not expose them separately: scraping them would only produce
+# permanent "target down" alerts.
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeEtcd: { enabled: false }
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    windows: false
+
+prometheusOperator:
+  # No admission webhook: it would be called by the API server from the node,
+  # through the monitoring NetworkPolicy, and needs certificate jobs. Rules come
+  # from Git; a bad rule shows up in the operator's log instead of being refused.
+  admissionWebhooks:
+    enabled: false
+  tls:
+    enabled: false
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    retention: 7d
+    retentionSize: 4GB               # below the 5Gi volume
+    # Pick up ServiceMonitors / PodMonitors / rules from any namespace and release
+    # (Open5GS and gNB exporters come in 4.2-4.3 from their own apps).
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    # Memory limit only: a CPU limit would throttle; the request gives it a fair share.
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { memory: 1536Mi }
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests: { storage: 5Gi }
+
+alertmanager:
+  # Default config routes everything to a "null" receiver; real receivers in 4.5.
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+      limits: { memory: 128Mi }
+
+grafana:
+  # Admin password from AWS SSM via External Secrets (deploy/monitoring/extras),
+  # never in Git. Reached with kubectl port-forward, like Argo CD.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  testFramework:
+    enabled: false                   # no Helm test pod: Argo CD does not run Helm tests
+  persistence:
+    enabled: false                   # dashboards will be code (4.4), nothing to keep
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 384Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 10m, memory: 24Mi }
+    limits: { memory: 64Mi }

@@ -1,0 +1,24 @@
+# Grafana's admin login, from AWS SSM Parameter Store (/handover/grafana/admin-password,
+# created once by CLI, see docs/runbook.md). Git holds only where it lives.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-admin
+  namespace: monitoring
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: aws-ssm
+  target:
+    name: grafana-admin
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        admin-user: admin
+        admin-password: "{{ .password }}"
+  data:
+    - secretKey: password
+      remoteRef:
+        key: /handover/grafana/admin-password
