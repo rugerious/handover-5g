@@ -130,3 +130,24 @@ spec:
             matchLabels: { app.kubernetes.io/name: ran }
       ports:
         - { protocol: UDP, port: 2152 }
+---
+# Phase 4.2: Prometheus (namespace monitoring) may scrape the four core functions
+# that export metrics, on their metrics port only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: core
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app.kubernetes.io/name, operator: In, values: [amf, smf, upf, pcf] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+      ports:
+        - { protocol: TCP, port: 9090 }

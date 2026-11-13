@@ -16,3 +16,9 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    retry:                 # on a new cluster the core/ran/monitoring namespaces may not exist yet
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
