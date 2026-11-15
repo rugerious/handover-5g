@@ -6,6 +6,34 @@
 
 A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) running on Kubernetes in AWS, deployed by GitOps, with RAN KPI observability, automated acceptance testing and an AI ops assistant.
 
+![RAN KPI dashboard: availability, accessibility, integrity, recovery](docs/img/ran-kpi-dashboard.png)
+*The RAN KPI dashboard (Grafana, defined in Git) with live data from the lab, 15 Nov 2026: one simulated UE under traffic.*
+
+```mermaid
+flowchart LR
+  PR[Pull request] --> GH[GitHub main] --> ARGO[Argo CD]
+  ARGO -->|deploys| AWS
+  subgraph AWS["AWS EC2 · k3s · no inbound ports"]
+    subgraph RAN["RAN pod (our Helm chart)"]
+      UE[srsUE] -->|ZeroMQ| GNB[OCUDU gNB] -->|JSON, loopback| EXP[KPI exporter]
+    end
+    subgraph CORE["5G core (Open5GS)"]
+      AMF
+      SMF
+      UPF
+    end
+    subgraph OBS["Observability"]
+      PROM[Prometheus] --> GRAF[Grafana]
+      PROM --> AM[Alertmanager]
+    end
+    GNB -->|N2| AMF
+    GNB -->|N3| UPF
+    SMF -->|N4| UPF
+    EXP --> PROM
+    CORE -.->|metrics| PROM
+  end
+```
+
 **The goal:** degrade a UE's radio on purpose → a model detects the KPI drop → an LLM explains it → the fix arrives as a pull request → a human approves → the KPIs recover → an acceptance report is published.
 
 ## Status
@@ -16,7 +44,7 @@ A cloud-native 5G network (Open5GS core + OCUDU gNB with a simulated radio) runn
 | 1 | Infrastructure on AWS: Terraform state + OIDC pipeline, VPC, EC2 node, Ansible + k3s | 8–10 | ✅ 30 Oct 2026 (~7 h) |
 | 2 | 5G workloads on Kubernetes: Open5GS (community Helm chart) + OCUDU gNB and srsUE over ZeroMQ (own Helm chart) | 12–16 | ✅ 10 Nov 2026 (~12 h) |
 | 3 | GitOps with ArgoCD, secrets from AWS, default-deny NetworkPolicies | 7–9 | ✅ 12 Nov 2026 (~9 h) |
-| 4 | Observability: RAN KPI dashboards and alerts | 8–10 | 🚧 4.1 monitoring platform, 4.2 core metrics, 4.3 gNB metrics |
+| 4 | Observability: RAN KPI dashboards and alerts | 8–10 | 🚧 4.1 monitoring platform, 4.2 core metrics, 4.3 gNB metrics, 4.4 RAN KPI dashboard |
 | — | **MVP:** one UE attached, deployed by GitOps, KPI dashboards live | **39–51** | |
 | 5 | Multi-UE, a second cell and a radio degradation injector; automated acceptance with public reports | 12–16 | ⏳ |
 | 6a | AI ops assistant: Isolation Forest detects, LLM explains, MCP tools (read / dry-run / open PR only), fix by pull request, incident in [CloudOps](https://github.com/rugerious/cloudops-aws-platform) | 13–17 | ⏳ |
@@ -85,6 +113,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 - **Nothing exposed, no password in Git:** Grafana and Prometheus are reached with `kubectl port-forward` through the SSM tunnel; Grafana's admin password was generated straight into AWS SSM Parameter Store and reaches the cluster through External Secrets (wrong password: 401). Only pods inside `monitoring` can connect to its pods (NetworkPolicy). The operator's admission webhook is off: it would be called from the node through that policy and needs certificate jobs; alert rules come from Git instead.
 - **5G core metrics:** the AMF, SMF, UPF and PCF now export Prometheus metrics (34 series: registrations requested/succeeded, connected gNBs, UEs, PDU sessions, PFCP associations, N3 user-plane packets), picked up through ServiceMonitors. One NetworkPolicy opens the core for this and nothing else: only Prometheus pods from `monitoring`, only to those four functions, only TCP 9090. Turning metrics on restarted all four; the core was Synced/Healthy again within a minute.
 - **Radio (gNB) metrics:** the OCUDU gNB has no Prometheus endpoint; it publishes JSON reports on a WebSocket that also accepts commands. Before writing any code we switched it on in a branch and recorded 30 s of real reports under traffic (228 messages, 9 report types): the gNB only starts sending after a `metrics_subscribe` command, DU counts (HARQ ACK/NACK, PRACH, Msg3) are per report while CU-CP counts (RRC setups, PDU sessions) are running totals, and the cost was within noise (gNB 1873m → 1888m CPU). Our exporter (`apps/kpi-exporter`, tested in its image build against those captured messages) runs as a 4th container in the RAN pod: the WebSocket stays on the pod's loopback, the exporter turns per-report counts into Prometheus counters, labels UEs by index rather than RNTI (a new RNTI on every attach would mean new series each time), and hides its gauges when reports stop (`gnb_up 0`, a gap rather than a frozen healthy line). It has no health probe on purpose: the pod's Ready status means "the UE can pass traffic" and drives the watchdog, so a metrics problem can never restart the radio. Prometheus reaches it through a PodMonitor and one NetworkPolicy (Prometheus pods only, TCP 9100 only). Only the layers the dashboard uses are on: scheduler (cell + per UE), RRC and NGAP.
+- **RAN KPI dashboard, as code:** one Grafana dashboard (`deploy/monitoring/extras/dashboard-ran-kpis.yaml`, loaded by Grafana's sidecar, read-only in the UI so Git stays the only source) answers the four questions an operator asks: *is the cell on air* (gNB reporting, N2 link, UEs, UE data path), *can a phone get in* (RRC and PDU session success), *how good is the link* (throughput, HARQ BLER, MCS, CQI, uplink SNR) and *what happens when it breaks* (RAN pods in 24 h, exporter, CPU per container). The screenshot at the top is live data. A longer window showed what the 30 s capture missed: under load, uplink BLER sits around 1 % while downlink stays at 0 %. Grafana was at 326 Mi of its 384 Mi limit before this dashboard, so the limit went to 512 Mi first.
 - **What that restart revealed:** the UE kept its tunnel, but the SMF and UPF had restarted together and the session behind it was gone: ping 100% loss while everything looked healthy, and the RAN watchdog (which checked only that the tunnel exists) saw nothing. A RAN restart repaired it (new attach, new session, ping 0% loss). **Fixed (RAN chart 0.5.0):** srsUE is Ready only when one ping through its tunnel reaches the core (every 10 s), and the watchdog acts on the Deployment's Ready status, which it could already read, so it needed no new permission. Same break reproduced (SMF + UPF restarted together): RAN not Ready within ~1 min, watchdog restart, first new attach failed (a known core issue after SMF restarts: the AMF keeps a stale session context; recovered automatically, root cause still being investigated), second automatic restart, traffic back about 5 min after the break, with no human action.
 
 ## Planned architecture

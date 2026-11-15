@@ -20,7 +20,7 @@ data:
       ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "editable": false,
       "graphTooltip": 1,
       "refresh": "10s",
@@ -699,7 +699,7 @@ data:
         {
           "type": "timeseries",
           "title": "HARQ BLER",
-          "description": "NACK / (ACK + NACK) over 1 min, per direction (gnb_ue_harq_total).",
+          "description": "NACK / (ACK + NACK) over 1 min, per direction (gnb_ue_harq_total). Measured 15 Nov under 5 pings/s: DL 0 %, UL about 1 %.",
           "id": 13,
           "datasource": {
             "type": "prometheus",
@@ -750,7 +750,7 @@ data:
         {
           "type": "timeseries",
           "title": "MCS",
-          "description": "Modulation and coding scheme index per direction (0–28).",
+          "description": "Modulation and coding scheme index per direction (0–28). 0 while the UE has nothing to send: the gNB schedules nothing.",
           "id": 14,
           "datasource": {
             "type": "prometheus",
@@ -896,7 +896,9 @@ data:
                 "fillOpacity": 10,
                 "showPoints": "never",
                 "spanNulls": false
-              }
+              },
+              "min": 0,
+              "max": 10
             },
             "overrides": []
           }
