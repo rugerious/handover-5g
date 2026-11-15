@@ -106,7 +106,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
 | `deploy/` | Kubernetes deployments: Helm values for the 5G core (`core/`) and Argo CD (`argocd/`), the AWS secret store (`secret-store/`), the subscriber loader (`core-subscribers/`), NetworkPolicies (`network-policies/`), operator permissions (`rbac/`), monitoring (`monitoring/`) |
 | `charts/ran/` | Our Helm chart: OCUDU gNB + srsUE in one pod over ZeroMQ, plus the watchdog that restarts the RAN when the UE has no session |
 | `versions.yaml` | Every version the lab runs (OCUDU, srsUE, Open5GS, k3s, tools), pinned to exact commits |
-| `apps/kpi-exporter/` | Fake gNB KPI exporter (Python, Dockerfile, Kubernetes manifests) |
+| `apps/kpi-exporter/` | gNB KPI exporter (Python): reads the OCUDU gNB's JSON metrics over its loopback WebSocket and serves them to Prometheus; tests run in the image build against real captured messages. `k8s/` holds the Phase 0 local (k3d) manifests |
 | `labs/` | Kubernetes learning labs |
 | `.github/` | CI workflows, Dependabot, pull request checklist |
 | `scripts/` | `nettest.sh`: isolation test for the NetworkPolicies |
