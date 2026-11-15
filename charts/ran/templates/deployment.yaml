@@ -95,6 +95,35 @@ spec:
               mountPath: /run/usim
             - name: dev-tun          # the one device the UE needs, instead of privileged
               mountPath: /dev/net/tun
+        {{- if .Values.exporter.enabled }}
+        # gNB KPIs for Prometheus (Phase 4.3). No probes on purpose: the pod's
+        # Ready status means "the UE can pass traffic" (bug 21) and drives the
+        # watchdog; a metrics problem must never restart the radio.
+        - name: exporter
+          image: "{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag }}"
+          env:
+            - name: GNB_WS_URL
+              value: ws://127.0.0.1:8001
+            - name: PORT
+              value: "{{ .Values.exporter.port }}"
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.exporter.port }}
+              protocol: TCP
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+        {{- end }}
         {{- if .Values.watchdog.enabled }}
         - name: watchdog
           image: "{{ .Values.watchdog.image.repository }}:{{ .Values.watchdog.image.tag }}"

@@ -51,3 +51,26 @@ log:
 pcap:
   ngap_enable: true
   ngap_filename: /tmp/gnb_ngap.pcap
+
+# Phase 4.3: KPIs for Prometheus. The gNB publishes JSON reports (one per layer,
+# every second) on its remote control WebSocket; the exporter container in this
+# pod subscribes and serves them as Prometheus metrics. Keys and defaults read
+# from `gnb --emit-config-schema`. Measured 15 Nov 2026: gNB CPU 1873m -> 1888m
+# with most layers on (within noise). Only the layers the dashboard uses are on.
+metrics:
+  enable_json: true
+  layers:
+    enable_sched: true        # per cell: scheduler latency, PRACH, Msg3, PDCCH failures
+    enable_sched_ue: true     # per UE: bit rate, MCS, CQI, SNR, HARQ ACK/NACK
+    enable_rrc: true          # RRC setups attempted/successful, connected UEs
+    enable_ngap: true         # AMF link, PDU sessions requested/successful/failed
+  periodicity:
+    du_report_period: 1000    # ms
+    cu_cp_report_period: 1000
+
+# The WebSocket also accepts commands, so it listens on the pod's loopback only:
+# reachable by the exporter container, never from the network.
+remote_control:
+  enabled: true
+  bind_addr: 127.0.0.1
+  port: 8001
