@@ -56,11 +56,43 @@ prometheus:
             requests: { storage: 5Gi }
 
 alertmanager:
-  # Default config routes everything to a "null" receiver; real receivers in 4.5.
+  # Phase 4.5: the config comes from a Secret built by External Secrets
+  # (deploy/monitoring/extras/alertmanager-config.yaml): our alerts (lab=handover)
+  # go to the SNS topic, which emails them; everything else to "null".
   alertmanagerSpec:
+    useExistingSecret: true
+    configSecret: alertmanager-handover
     resources:
       requests: { cpu: 10m, memory: 32Mi }
       limits: { memory: 128Mi }
+    # Its own AWS identity, no keys: a service-account token made for AWS STS
+    # (refreshed by Kubernetes, 1 h), exchanged for the handover-alertmanager
+    # role (infra/alerts.tf: sns:Publish on one topic). The role ARN contains the
+    # account ID, so it comes from the same Secret, not from Git.
+    volumes:
+      - name: aws-token
+        projected:
+          sources:
+            - serviceAccountToken:
+                audience: sts.amazonaws.com
+                expirationSeconds: 3600
+                path: token
+    volumeMounts:
+      - name: aws-token
+        mountPath: /var/run/secrets/aws
+        readOnly: true
+    containers:
+      - name: alertmanager
+        env:
+          - name: AWS_ROLE_ARN
+            valueFrom:
+              secretKeyRef: { name: alertmanager-handover, key: role-arn }
+          - name: AWS_WEB_IDENTITY_TOKEN_FILE
+            value: /var/run/secrets/aws/token
+          - name: AWS_REGION
+            value: eu-west-2
+          - name: AWS_STS_REGIONAL_ENDPOINTS
+            value: regional
 
 grafana:
   # Admin password from AWS SSM via External Secrets (deploy/monitoring/extras),
