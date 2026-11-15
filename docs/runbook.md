@@ -67,6 +67,17 @@ export KUBECONFIG=~/.kube/handover.yaml       # back to the daily user
 After an hour the file stops working; run the playbook again if more time is needed.
 The other way in is a shell on the node through SSM: `sudo k3s kubectl ...`.
 
+## Alert email (once, and on a rebuild)
+
+Alerts labelled `lab=handover` go from Alertmanager to the SNS topic `handover-alerts`
+(infra/alerts.tf), which emails them. The address is never in Git: subscribe it once, then
+click **Confirm subscription** in the email AWS sends (check junk).
+```bash
+TOPIC=$(aws ssm get-parameter --name /handover/alerts/topic-arn --query Parameter.Value --output text)
+aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint <your alerts address>
+```
+To stop the emails: `aws sns unsubscribe --subscription-arn <arn from list-subscriptions-by-topic>`.
+
 ## New laptop
 
 Everything the lab needs lives in GitHub, AWS and the node; the laptop only holds tools and
