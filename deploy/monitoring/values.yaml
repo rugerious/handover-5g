@@ -73,9 +73,11 @@ grafana:
     enabled: false                   # no Helm test pod: Argo CD does not run Helm tests
   persistence:
     enabled: false                   # dashboards will be code (4.4), nothing to keep
+  # 15 Nov: 326Mi before our first dashboard (85% of the old 384Mi limit), with
+  # 25 chart dashboards loaded; 512Mi leaves room for ours without an OOM kill.
   resources:
     requests: { cpu: 50m, memory: 128Mi }
-    limits: { memory: 384Mi }
+    limits: { memory: 512Mi }
 
 kube-state-metrics:
   resources:
