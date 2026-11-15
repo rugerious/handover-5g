@@ -63,6 +63,7 @@ Estimated effort is **74–98 hours** at 8–10 hours a week, about 9–11 weeks
   - pull requests → `plan` with a **read-only** role that cannot read any other S3 object in the account;
   - merge to `main` → `apply` of exactly the planned change, **only after a human approves** the `production` environment.
 - The apply role can manage only `handover-*` IAM resources and **cannot modify its own permissions**.
+- Every role the pipeline creates or empowers must carry a **permissions boundary** (`handover-workload-boundary`: no IAM, Organizations, account or role chaining), and the pipeline cannot remove or change it. Without that, a role that can create roles could build itself an administrator.
 - Dependabot keeps actions, Python, Docker and Terraform dependencies current.
 - GitHub **secret scanning, push protection** and **Dependabot security updates** are on.
 - A **pre-commit hook** (`.githooks/pre-commit`) blocks any commit that adds the AWS account ID or other listed values. The values live outside the repo, so the hook itself reveals nothing. Every PR also carries a checklist (README, plan read, no identifiers).

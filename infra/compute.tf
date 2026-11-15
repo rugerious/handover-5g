@@ -29,9 +29,10 @@ data "aws_iam_policy_document" "instance_trust" {
 }
 
 resource "aws_iam_role" "instance" {
-  name               = "handover-instance"
-  description        = "Lab node: SSM Session Manager only"
-  assume_role_policy = data.aws_iam_policy_document.instance_trust.json
+  name                 = "handover-instance"
+  description          = "Lab node: SSM Session Manager only"
+  assume_role_policy   = data.aws_iam_policy_document.instance_trust.json
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 resource "aws_iam_role_policy_attachment" "instance_ssm" {
@@ -108,9 +109,10 @@ data "aws_iam_policy_document" "scheduler_trust" {
 }
 
 resource "aws_iam_role" "scheduler_stop" {
-  name               = "handover-scheduler-stop"
-  description        = "Lets EventBridge Scheduler stop the lab node at night"
-  assume_role_policy = data.aws_iam_policy_document.scheduler_trust.json
+  name                 = "handover-scheduler-stop"
+  description          = "Lets EventBridge Scheduler stop the lab node at night"
+  assume_role_policy   = data.aws_iam_policy_document.scheduler_trust.json
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 data "aws_iam_policy_document" "scheduler_stop" {

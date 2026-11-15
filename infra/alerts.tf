@@ -52,6 +52,7 @@ resource "aws_iam_role" "alertmanager" {
   description          = "Alertmanager on k3s: publish to the handover-alerts SNS topic only"
   assume_role_policy   = data.aws_iam_policy_document.alertmanager_trust.json
   max_session_duration = 3600
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 data "aws_iam_policy_document" "alertmanager_publish" {

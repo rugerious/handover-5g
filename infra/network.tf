@@ -113,9 +113,10 @@ data "aws_iam_policy_document" "flow_logs_trust" {
 }
 
 resource "aws_iam_role" "flow_logs" {
-  name               = "handover-vpc-flow-logs"
-  description        = "Lets VPC Flow Logs write to the handover log group"
-  assume_role_policy = data.aws_iam_policy_document.flow_logs_trust.json
+  name                 = "handover-vpc-flow-logs"
+  description          = "Lets VPC Flow Logs write to the handover log group"
+  assume_role_policy   = data.aws_iam_policy_document.flow_logs_trust.json
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 data "aws_iam_policy_document" "flow_logs_write" {

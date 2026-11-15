@@ -145,16 +145,13 @@ data "aws_iam_policy_document" "apply_iam" {
   statement {
     sid = "ManageHandoverIam"
     actions = [
-      "iam:CreateRole",
       "iam:DeleteRole",
       "iam:UpdateRole",
       "iam:UpdateRoleDescription",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
-      "iam:PutRolePolicy",
       "iam:DeleteRolePolicy",
-      "iam:AttachRolePolicy",
       "iam:DetachRolePolicy",
       "iam:PassRole",
       "iam:CreateInstanceProfile",
@@ -175,6 +172,48 @@ data "aws_iam_policy_document" "apply_iam" {
       "arn:aws:iam::${local.account_id}:instance-profile/handover-*",
       "arn:aws:iam::${local.account_id}:policy/handover-*",
     ]
+  }
+
+  # Giving a role permissions is allowed only if the role carries the workload
+  # boundary (below). So CI can never create a role more powerful than the
+  # boundary allows, whatever policy it attaches.
+  statement {
+    sid = "GrantOnlyInsideTheBoundary"
+    actions = [
+      "iam:CreateRole",
+      "iam:PutRolePolicy",
+      "iam:AttachRolePolicy",
+      "iam:PutRolePermissionsBoundary",
+    ]
+    resources = ["arn:aws:iam::${local.account_id}:role/handover-*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [aws_iam_policy.workload_boundary.arn]
+    }
+  }
+
+  # CI can neither remove the boundary from a role nor change the boundary itself.
+  statement {
+    sid       = "KeepTheBoundaryOnRoles"
+    effect    = "Deny"
+    actions   = ["iam:DeleteRolePermissionsBoundary"]
+    resources = ["arn:aws:iam::${local.account_id}:role/handover-*"]
+  }
+
+  statement {
+    sid    = "KeepTheBoundaryPolicy"
+    effect = "Deny"
+    actions = [
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicyVersion",
+      "iam:SetDefaultPolicyVersion",
+      "iam:DeletePolicy",
+      "iam:TagPolicy",
+      "iam:UntagPolicy",
+    ]
+    resources = [aws_iam_policy.workload_boundary.arn]
   }
 
   # Manage only the k3s cluster's OIDC provider (infra/eso.tf), never the
@@ -224,6 +263,43 @@ resource "aws_iam_role_policy" "apply_iam" {
   name   = "handover-apply-iam"
   role   = aws_iam_role.github_apply.id
   policy = data.aws_iam_policy_document.apply_iam.json
+}
+
+# ---------------------------------------------------------------------------
+# Permissions boundary for every role the pipeline creates (MVP hardening)
+# ---------------------------------------------------------------------------
+# Without it, the apply role (PowerUser + IAM on handover-*) could create a
+# handover-* role, attach AdministratorAccess and assume it: from "can deploy"
+# to "owns the account". A boundary is a ceiling: whatever policy is attached,
+# the role can never do more than this. Every workload role carries it, and
+# the apply role may only create or empower roles that do (GrantOnlyInsideTheBoundary).
+# It caps the roles at what the pipeline itself can already do, minus identity
+# and account control. Changing it is bootstrap-only (KeepTheBoundaryPolicy).
+data "aws_iam_policy_document" "workload_boundary" {
+  statement {
+    sid       = "AllowServiceWork"
+    actions   = ["*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "NoIdentityOrAccountControl"
+    effect = "Deny"
+    actions = [
+      "iam:*",
+      "organizations:*",
+      "account:*",
+      "sts:AssumeRole",
+      "sts:AssumeRoleWithSAML",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "workload_boundary" {
+  name        = "handover-workload-boundary"
+  description = "Ceiling for every Handover workload role: no IAM, Organizations, account or role chaining"
+  policy      = data.aws_iam_policy_document.workload_boundary.json
 }
 
 # ---------------------------------------------------------------------------
