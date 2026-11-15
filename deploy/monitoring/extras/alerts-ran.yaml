@@ -1,0 +1,70 @@
+# Phase 4.5: alert rules as code for the RAN (kube-prometheus-stack picks up every
+# PrometheusRule; the rule selector is open). Every rule carries lab: handover so
+# Alertmanager can send ours, and only ours, to the email channel.
+# Thresholds are set from what we measured (15 Nov 2026): DL BLER 0 %, UL ~1 %
+# under load; the RAN comes back 22 s after a restart; the watchdog acts after
+# ~90 s of no data path.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: handover-ran
+  namespace: monitoring
+spec:
+  groups:
+    - name: handover-ran-availability
+      rules:
+        - alert: GnbDown
+          expr: max(gnb_up) == 0 or absent(gnb_up)
+          for: 2m
+          labels: { severity: critical, lab: handover }
+          annotations:
+            summary: The gNB has stopped reporting
+            description: No cell report from the OCUDU gNB for 2 minutes (gnb_up 0 or missing). The cell is probably off air, or the KPI exporter lost it.
+        - alert: N2LinkDown
+          expr: max(gnb_ngap_amf_connected) == 0
+          for: 1m
+          labels: { severity: critical, lab: handover }
+          annotations:
+            summary: gNB lost its N2 link to the AMF
+            description: The NGAP association between the gNB and the AMF has been down for 1 minute. No UE can attach.
+        - alert: UeDataPathDown
+          expr: max(kube_deployment_status_replicas_ready{namespace="ran", deployment="ran"}) < 1
+          for: 3m
+          labels: { severity: critical, lab: handover }
+          annotations:
+            summary: The UE cannot pass traffic
+            description: The RAN pod has not been Ready for 3 minutes (Ready = a ping through the UE tunnel works, bug 21). The watchdog should already have restarted it; check its log.
+        - alert: RanRestarted
+          expr: (time() - max(kube_pod_created{namespace="ran", pod=~"ran-.+"})) < 600
+          labels: { severity: warning, lab: handover }
+          annotations:
+            summary: The RAN pod was recreated in the last 10 minutes
+            description: A new RAN pod started (watchdog restart, rollout or deploy). If nobody deployed, the watchdog recovered the radio (bugs 16, 17, 21) and the root cause should be looked at.
+    - name: handover-ran-quality
+      rules:
+        - alert: HighBler
+          expr: |
+            (sum by (direction) (rate(gnb_ue_harq_total{result="nack"}[5m]))
+              / sum by (direction) (rate(gnb_ue_harq_total[5m]))) > 0.10
+            and sum by (direction) (rate(gnb_ue_harq_total[5m])) > 1
+          for: 5m
+          labels: { severity: warning, lab: handover }
+          annotations:
+            summary: "HARQ BLER above 10 % ({{ $labels.direction }})"
+            description: "{{ $labels.direction }} BLER is {{ $value | humanizePercentage }} over 5 minutes, with traffic. Measured baseline: DL 0 %, UL about 1 %."
+        - alert: AttachFailures
+          expr: |
+            increase(gnb_pdu_session_setups_total{result="failed"}[10m]) > 0
+            or (sum(increase(gnb_rrc_connection_establishments_total{result="attempted"}[10m]))
+                - sum(increase(gnb_rrc_connection_establishments_total{result="successful"}[10m]))) > 0
+          labels: { severity: warning, lab: handover }
+          annotations:
+            summary: RRC or PDU session setups failed
+            description: At least one RRC connection setup or PDU session setup failed in the last 10 minutes.
+        - alert: KpiExporterDisconnected
+          expr: max(gnb_exporter_websocket_connected) == 0
+          for: 2m
+          labels: { severity: warning, lab: handover }
+          annotations:
+            summary: The KPI exporter is not subscribed to the gNB
+            description: The exporter has been retrying its WebSocket for 2 minutes. Dashboard and alerts are blind to the radio.
