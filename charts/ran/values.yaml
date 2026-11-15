@@ -52,3 +52,13 @@ watchdog:
   graceSeconds: 60           # after the pod starts: gNB up + UE 15 s delay + attach
   periodSeconds: 15
   missingChecks: 6           # 6 checks in a row not Ready (75-90 s) -> restart the RAN
+
+# Phase 4.3: gNB KPI exporter (apps/kpi-exporter), a 4th container in this pod. It
+# reads the gNB's JSON metrics on 127.0.0.1:8001 and serves /metrics for
+# Prometheus (PodMonitor in templates/podmonitor.yaml).
+exporter:
+  enabled: true
+  image:
+    repository: ghcr.io/rugerious/handover-5g/kpi-exporter
+    tag: sha-aebdd10           # main build of PR #71
+  port: 9100

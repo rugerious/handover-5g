@@ -1,0 +1,20 @@
+{{- if .Values.exporter.enabled }}
+# Phase 4.3: Prometheus (kube-prometheus-stack, namespace monitoring) scrapes the
+# exporter container of the RAN pod. A PodMonitor needs no Service: nothing else
+# should reach this port. NetworkPolicy: deploy/network-policies/ran.yaml.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Release.Name }}-gnb
+  labels:
+    app.kubernetes.io/name: ran
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ran
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+{{- end }}
