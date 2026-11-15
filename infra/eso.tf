@@ -50,6 +50,7 @@ resource "aws_iam_role" "eso" {
   description          = "External Secrets on k3s: read /handover/* from SSM Parameter Store"
   assume_role_policy   = data.aws_iam_policy_document.eso_trust.json
   max_session_duration = 3600
+  permissions_boundary = aws_iam_policy.workload_boundary.arn
 }
 
 # Read-only, and only the lab's own parameters.
